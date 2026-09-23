@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.db
+*.sqlite
+*.sqlite3
+.idea/
+.vscode/
+*.egg-info/
+dist/
+build/
+.DS_Store
+*.log
+.pytest_cache/
+.mypy_cache/
+*.spec.bak
+
+# Local runtime (feeds, images, lock) — not source
+/data/
+
+# License signing secret and the issuer. Not in the public repo.
+/secrets/
+core/_embedded_hmac.py
+tools/issue_license.py

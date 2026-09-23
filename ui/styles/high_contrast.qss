@@ -1,0 +1,80 @@
+QMainWindow, QDialog, QWidget {
+    background-color: #000000;
+    color: #ffffff;
+    font-family: "Segoe UI", "Noto Sans", sans-serif;
+    font-size: 14px;
+}
+
+QSplitter::handle {
+    background: #ffff00;
+    width: 3px;
+}
+
+QListWidget, QTextBrowser, QPlainTextEdit, QLineEdit, QComboBox, QScrollArea, QTableWidget {
+    background-color: #111111;
+    color: #ffffff;
+    border: 2px solid #ffff00;
+    border-radius: 4px;
+    padding: 6px;
+    selection-background-color: #0055ff;
+}
+
+QPushButton {
+    background: #0055ff;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-weight: 700;
+}
+
+QPushButton:hover {
+    background: #1a6dff;
+}
+
+QPushButton:pressed, QPushButton[clickHeld="true"] {
+    background: #ffff00;
+    color: #000000;
+    border: 3px solid #ffffff;
+    padding-top: 10px;
+    padding-bottom: 6px;
+}
+
+QPushButton#ghostButton {
+    background: #000000;
+    border: 2px solid #ffff00;
+    color: #ffff00;
+}
+
+QPushButton#ghostButton:hover {
+    background: #222222;
+}
+
+QPushButton#ghostButton:pressed, QPushButton#ghostButton[clickHeld="true"] {
+    background: #ffff00;
+    color: #000000;
+}
+
+QTreeWidget::item:hover {
+    background: #222222;
+}
+
+QTreeWidget::item:selected {
+    background: #0055ff;
+    color: #ffffff;
+    border: 2px solid #ffff00;
+}
+
+QTabBar::tab:selected {
+    background: #0055ff;
+    color: #ffffff;
+}
+
+QTabBar::tab:pressed {
+    background: #ffff00;
+    color: #000000;
+}
+
+QLabel {
+    color: #ffffff;
+}
