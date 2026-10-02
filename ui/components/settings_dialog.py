@@ -1079,6 +1079,7 @@ class SettingsDialog(QDialog):
         path, _filter = QFileDialog.getOpenFileName(self, self._i18n.t("app.restore"), "", "SQLite (*.db)")
         if not path:
             return
+        self._db.release()
         restore_database(Path(path))
         QMessageBox.information(self, self._i18n.t("app.settings"), self._i18n.t("app.restore_done"))
 

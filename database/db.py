@@ -178,10 +178,22 @@ def is_http_url(value: str) -> bool:
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
+class _SharedConnection(sqlite3.Connection):
+    """One connection per Database; callers' close() only ends a dangling transaction."""
+
+    def close(self) -> None:
+        if self.in_transaction:
+            self.rollback()
+
+    def really_close(self) -> None:
+        super().close()
+
+
 class Database:
     def __init__(self, path: Path = DB_PATH) -> None:
         self.path = path
         self._lock = threading.RLock()
+        self._conn: _SharedConnection | None = None
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self._init_schema()
         hours = parse_retention_hours(self.get_setting("article_retention_hours"))
@@ -189,11 +201,21 @@ class Database:
             self.purge_expired_articles(hours)
 
     def connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.path, check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute("PRAGMA journal_mode = WAL")
-        return conn
+        with self._lock:
+            if self._conn is None:
+                conn = sqlite3.connect(self.path, check_same_thread=False, factory=_SharedConnection)
+                conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA foreign_keys = ON")
+                conn.execute("PRAGMA journal_mode = WAL")
+                self._conn = conn
+            return self._conn
+
+    def release(self) -> None:
+        """Close the shared connection, e.g. before the database file is replaced."""
+        with self._lock:
+            if self._conn is not None:
+                self._conn.really_close()
+                self._conn = None
 
     def _init_schema(self) -> None:
         with self._lock:

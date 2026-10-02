@@ -7,7 +7,6 @@ import re
 from urllib.parse import quote
 
 import httpx
-from openai import OpenAI
 
 from config import (
     DEFAULT_AI_MODELS,
@@ -185,6 +184,8 @@ def _post_json(url: str, *, headers: dict[str, str], payload: dict, timeout: flo
 
 
 def _generate_openai(api_key: str, model: str, prompt: str, system: str, timeout: float) -> str:
+    from openai import OpenAI
+
     client = OpenAI(api_key=api_key, timeout=timeout)
     response = client.chat.completions.create(
         model=model,

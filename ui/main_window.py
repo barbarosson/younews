@@ -914,7 +914,7 @@ class MainWindow(QMainWindow):
         self.ticker.set_quotes(quotes)
         if self._mini_tape is not None:
             self._mini_tape.ticker.set_quotes(quotes)
-        if quotes and any(getattr(item, "stale", False) for item in quotes):
+        if self.market.has_failed and quotes and any(getattr(item, "stale", False) for item in quotes):
             if not any(
                 not getattr(item, "missing", False) and not getattr(item, "stale", False) for item in quotes
             ):

@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from time import time
 
 import httpx
-import yfinance as yf
 from PySide6.QtCore import QObject, QThread, QTimer, Signal
 
 from config import BROWSER_USER_AGENT, DATA_DIR, DEFAULT_MARKET_TICKERS, MARKET_REFRESH_SECONDS
@@ -140,6 +139,8 @@ def quote_from_cache(symbol: str, label: str, cache: dict[str, dict] | None = No
 def _download_chunk(symbols: list[str], period: str, interval: str):
     if not symbols:
         return None
+    import yfinance as yf
+
     try:
         return yf.download(
             symbols,
@@ -219,6 +220,8 @@ def _chart_closes(symbol: str, *, interval: str, range_: str) -> list[float]:
 
 
 def fetch_quotes(tickers: list[tuple[str, str]] | None = None, *, intraday: bool = False) -> list[TickerQuote]:
+    import yfinance as yf
+
     pairs = list(tickers) if tickers is not None else list(DEFAULT_MARKET_TICKERS)
     labels = {symbol: label for symbol, label in pairs}
     symbols = [symbol for symbol, _label in pairs]
@@ -297,11 +300,29 @@ class MarketEngine(QObject):
         self._fails = 0
 
     def start(self) -> None:
+        self._emit_cached()
         self.refresh()
         self._timer.start()
 
+    def _emit_cached(self) -> None:
+        pairs = [(item.symbol, item.label) for item in self._db.list_tickers(self._db.get_setting("active_watchlist") or "main")]
+        cache = _load_quote_cache()
+        cached = [quote_from_cache(symbol, label, cache) for symbol, label in pairs]
+        if any(cached):
+            self.quotes_ready.emit(
+                [
+                    item
+                    or TickerQuote(symbol=symbol, label=label or symbol, price=0.0, change_pct=0.0, missing=True)
+                    for item, (symbol, label) in zip(cached, pairs)
+                ]
+            )
+
     def stop(self) -> None:
         self._timer.stop()
+
+    @property
+    def has_failed(self) -> bool:
+        return self._fails > 0
 
     def refresh(self) -> None:
         if self._busy:

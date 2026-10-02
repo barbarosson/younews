@@ -509,6 +509,7 @@ class _TapeWidget(QWidget):
         path = QPainterPath()
         path.addRoundedRect(rect, 12, 12)
         painter.fillPath(path, QBrush(bg))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.setPen(QPen(QColor("#ffffff") if hovered or pinned or flashed else chip["accent"], 4 if flashed else 3 if hovered or pinned else 2))
         painter.drawPath(path)
         painter.fillRect(QRectF(rect.left(), rect.top(), 6, rect.height()), chip["accent"])
