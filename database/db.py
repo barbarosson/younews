@@ -340,6 +340,14 @@ class Database:
                 "UPDATE app_settings SET value = ? WHERE key = 'article_list_limit'",
                 (str(ARTICLE_LIST_LIMIT),),
             )
+        flipped = conn.execute(
+            "SELECT value FROM app_settings WHERE key = 'theme_default_light'"
+        ).fetchone()
+        if flipped is None:
+            conn.execute("UPDATE app_settings SET value = 'light' WHERE key = 'theme'")
+            conn.execute(
+                "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('theme_default_light', '1')"
+            )
         self._migrate_taxonomy(conn)
         self._seed_tickers_if_empty(conn)
 

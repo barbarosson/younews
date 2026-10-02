@@ -55,7 +55,7 @@ DATA_DIR = _user_data_dir()
 DB_PATH = DATA_DIR / "terminal.db"
 
 DEFAULT_LANGUAGE = "en"
-DEFAULT_THEME = "dark"
+DEFAULT_THEME = "light"
 THEMES: dict[str, str] = {
     "dark": "dark_theme.qss",
     "light": "light_theme.qss",
