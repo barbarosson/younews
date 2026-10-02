@@ -27,14 +27,18 @@ class DeskStewardTests(unittest.TestCase):
         return lambda key, default=None: data.get(key, default or key)
 
     def test_propose_then_confirm_adds_pack(self) -> None:
-        first = self.handle(self.db, "Türkiye haber paketi öner", t=self.en)
+        first = self.handle(self.db, "Suggest a crypto pack", t=self.en)
         self.assertTrue(first["handled"])
         self.assertTrue(first["pending"])
         before = self.db.query("SELECT COUNT(*) n FROM sources")[0]["n"]
         second = self.handle(self.db, "evet", t=self.en, pending=first["pending"])
         after = self.db.query("SELECT COUNT(*) n FROM sources")[0]["n"]
-        self.assertGreater(after, before)
         self.assertTrue(second["applied"]["sources"])
+        self.assertGreaterEqual(after, before)
+        from core.source_packs import SOURCE_PACKS
+
+        for _m, _t, _name, url in SOURCE_PACKS["crypto"]:
+            self.assertIsNotNone(self.db.find_source_by_url(url))
 
     def test_reject_leaves_sources(self) -> None:
         first = self.handle(self.db, "Suggest a tech pack", t=self.en)
