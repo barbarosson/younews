@@ -370,6 +370,19 @@ class Database:
             conn.execute(
                 "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('theme_default_light', '1')"
             )
+        owned = conn.execute(
+            "SELECT value FROM app_settings WHERE key = 'sources_default_ten'"
+        ).fetchone()
+        if owned is None:
+            default_urls = [url for _m, _n, url, *_rest in SEED_SOURCES]
+            marks = ", ".join("?" for _ in default_urls)
+            conn.execute(
+                f"UPDATE sources SET user_added = 1 WHERE IFNULL(user_added, 0) = 0 AND url NOT IN ({marks})",
+                default_urls,
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('sources_default_ten', '1')"
+            )
         self._migrate_taxonomy(conn)
         self._seed_tickers_if_empty(conn)
 

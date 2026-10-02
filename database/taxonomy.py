@@ -52,16 +52,6 @@ CATALOG: list[dict] = [
                 ],
             },
         ],
-        "sources": [
-            ("Reuters Business", "https://feeds.reuters.com/reuters/businessNews", "economy_markets.stocks"),
-            ("Bloomberg Markets", "https://feeds.bloomberg.com/markets/news.rss", "economy_markets.stocks"),
-            ("CNBC Top News", "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114", "economy_markets.stocks"),
-            ("Yahoo Finance", "https://finance.yahoo.com/news/rssindex", "economy_markets.stocks"),
-            ("BBC Business", "https://feeds.bbci.co.uk/news/business/rss.xml", "economy_markets.macro"),
-            ("ForexLive", "https://www.forexlive.com/feed/news", "economy_markets.macro.calendar"),
-            ("NPR Business", "https://feeds.npr.org/1014/rss.xml", "economy_markets.corporate"),
-            ("NYT Business", "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml", "economy_markets.corporate"),
-        ],
     },
     {
         "id": "crypto_web3",
@@ -106,11 +96,6 @@ CATALOG: list[dict] = [
                     ("crypto_web3.security.nfts", "topics.crypto_web3.security.nfts"),
                 ],
             },
-        ],
-        "sources": [
-            ("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/", "crypto_web3.assets"),
-            ("CoinTelegraph", "https://cointelegraph.com/rss", "crypto_web3.assets"),
-            ("Decrypt", "https://decrypt.co/feed", "crypto_web3.assets"),
         ],
     },
     {
@@ -157,13 +142,6 @@ CATALOG: list[dict] = [
                 ],
             },
         ],
-        "sources": [
-            ("The Verge", "https://www.theverge.com/rss/index.xml", "tech_mobility.consumer"),
-            ("TechCrunch", "https://techcrunch.com/feed/", "tech_mobility.ai"),
-            ("Electrek", "https://electrek.co/feed/", "tech_mobility.ev"),
-            ("Wired", "https://www.wired.com/feed/rss", "tech_mobility.consumer"),
-            ("Hacker News", "https://hnrss.org/frontpage", "tech_mobility.cyber"),
-        ],
     },
     {
         "id": "global_politics",
@@ -200,66 +178,6 @@ CATALOG: list[dict] = [
                     ("global_politics.defense.aerospace", "topics.global_politics.defense.aerospace"),
                 ],
             },
-        ],
-        "sources": [
-            ("Anadolu Ajansı", "https://www.aa.com.tr/tr/rss/default?cat=gundem", "global_politics.geopolitics"),
-            ("TRT Haber", "https://www.trthaber.com/sitene-ekle/rss/manset/", "global_politics.geopolitics"),
-            ("The New York Times", "https://rss.nytimes.com/services/xml/rss/nyt/World.xml", "global_politics.geopolitics"),
-            ("CNN International", "https://rss.cnn.com/rss/edition_world.rss", "global_politics.geopolitics"),
-            ("BBC News", "https://feeds.bbci.co.uk/news/world/rss.xml", "global_politics.geopolitics"),
-            ("The Guardian", "https://www.theguardian.com/world/rss", "global_politics.geopolitics"),
-            ("Deutsche Welle (DW)", "https://rss.dw.com/rdf/rss-en-all", "global_politics.geopolitics"),
-            ("Der Spiegel", "https://www.spiegel.de/schlagzeilen/index.rss", "global_politics.geopolitics"),
-            ("France 24", "https://www.france24.com/en/rss", "global_politics.geopolitics"),
-            ("Le Monde", "https://www.lemonde.fr/rss/une.xml", "global_politics.geopolitics"),
-            ("CGTN", "https://www.cgtn.com/subscribe/rss/world.xml", "global_politics.geopolitics"),
-            ("NHK World", "https://www3.nhk.or.jp/rss/news/cat0.xml", "global_politics.geopolitics"),
-            ("The Times of India", "https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "global_politics.geopolitics"),
-            ("The Hindu", "https://www.thehindu.com/feeder/default.rss", "global_politics.geopolitics"),
-            ("ANSA", "https://www.ansa.it/sito/ansait_rss.xml", "global_politics.geopolitics"),
-            ("CBC News", "https://rss.cbc.ca/lineup/topstories.xml", "global_politics.geopolitics"),
-            ("Yonhap News Agency", "https://en.yna.co.kr/RSS/news.xml", "global_politics.geopolitics"),
-            ("ABC News", "https://www.abc.net.au/news/feed/51120/rss.xml", "global_politics.geopolitics"),
-            ("G1 (Globo)", "https://g1.globo.com/rss/g1/", "global_politics.geopolitics"),
-            ("El País", "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada", "global_politics.geopolitics"),
-            ("El Universal", "https://www.eluniversal.com.mx/rss.xml", "global_politics.geopolitics"),
-            ("TASS", "https://tass.com/rss/v2.xml", "global_politics.geopolitics"),
-            ("Antara News", "https://www.antaranews.com/rss/terkini.xml", "global_politics.geopolitics"),
-            ("Arab News", "https://www.arabnews.com/cat/1/rss.xml", "global_politics.geopolitics"),
-            ("NOS News", "https://feeds.nos.nl/nosnieuws", "global_politics.geopolitics"),
-            ("SWI swissinfo.ch", "https://www.swissinfo.ch/eng/rss/index", "global_politics.geopolitics"),
-            ("TVN24", "https://tvn24.pl/najnowsze.xml", "global_politics.geopolitics"),
-            ("Clarín", "https://www.clarin.com/rss/lo-ultimo/", "global_politics.geopolitics"),
-            ("Sveriges Radio", "https://sverigesradio.se/rssfeed/rssfeed.aspx?elfeed=2054", "global_politics.geopolitics"),
-            ("VRT NWS", "https://www.vrt.be/vrtnws/nl.rss.headlines.xml", "global_politics.geopolitics"),
-            ("Premium Times", "https://www.premiumtimesng.com/feed", "global_politics.geopolitics"),
-            ("Ahram Online", "https://english.ahram.org.eg/rss/World.aspx", "global_politics.geopolitics"),
-            ("ORF", "https://rss.orf.at/news.xml", "global_politics.geopolitics"),
-            ("RTÉ News", "https://www.rte.ie/news/rss/news-headlines.xml", "global_politics.geopolitics"),
-            ("The Times of Israel", "https://www.timesofisrael.com/feed/", "global_politics.geopolitics"),
-            ("NRK", "https://www.nrk.no/toppsaker.rss", "global_politics.geopolitics"),
-            ("The National", "https://www.thenationalnews.com/arc/outboundfeeds/rss/", "global_politics.geopolitics"),
-            ("CNA (Channel NewsAsia)", "https://www.channelnewsasia.com/api/v1/rss-outbound/rssnews/posts.xml", "global_politics.geopolitics"),
-            ("DR Nyheder", "https://www.dr.dk/nyheder/service/feeds/alleneheder", "global_politics.geopolitics"),
-            ("Bernama", "https://www.bernama.com/en/rss/news.php", "global_politics.geopolitics"),
-            ("News24", "http://feeds.news24.com/articles/news24/World/rss", "global_politics.geopolitics"),
-            ("Philippine News Agency", "https://www.pna.gov.ph/rss", "global_politics.geopolitics"),
-            ("El Tiempo", "https://www.eltiempo.com/rss/mundo.xml", "global_politics.geopolitics"),
-            ("Yle News", "https://feeds.yle.fi/uutiset/v1/majorHeadlines/YLE_UUTISET.rss", "global_politics.geopolitics"),
-            ("RTP Notícias", "https://www.rtp.pt/noticias/rss", "global_politics.geopolitics"),
-            ("AMNA (Athens News Agency)", "https://www.amna.gr/rss/feed", "global_politics.geopolitics"),
-            ("Bangkok Post", "https://www.bangkokpost.com/rss/data/topstories.xml", "global_politics.geopolitics"),
-            ("VnExpress", "https://vnexpress.net/rss/tin-moi-nhat.rss", "global_politics.geopolitics"),
-            ("Dawn", "https://www.dawn.com/feeds/home/", "global_politics.geopolitics"),
-            ("The Kyiv Independent", "https://kyivindependent.com/feed/", "global_politics.geopolitics"),
-            ("RNZ (Radio New Zealand)", "https://www.rnz.co.nz/rss/news.xml", "global_politics.geopolitics"),
-            ("Radio Prague International", "https://english.radio.cz/rss/news", "global_politics.geopolitics"),
-            ("Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml", "global_politics.geopolitics"),
-            ("Daily Nation", "https://nation.africa/kenya/rss", "global_politics.geopolitics"),
-            ("Foreign Policy", "https://foreignpolicy.com/feed/", "global_politics.geopolitics"),
-            ("Reuters World", "https://feeds.reuters.com/Reuters/worldNews", "global_politics.geopolitics"),
-            ("NPR News", "https://feeds.npr.org/1001/rss.xml", "global_politics.elections"),
-            ("Politico", "https://rss.politico.com/politics-news.xml", "global_politics.elections"),
         ],
     },
     {
@@ -308,11 +226,6 @@ CATALOG: list[dict] = [
                 ],
             },
         ],
-        "sources": [
-            ("The Art Newspaper", "https://www.theartnewspaper.com/rss.xml", "lifestyle_culture.arts"),
-            ("Hyperallergic", "https://hyperallergic.com/feed/", "lifestyle_culture.arts"),
-            ("Wired Culture", "https://www.wired.com/feed/category/culture/latest/rss", "lifestyle_culture.arts"),
-        ],
     },
     {
         "id": "sports_entertainment",
@@ -355,24 +268,6 @@ CATALOG: list[dict] = [
                     ("sports_entertainment.entertainment.cinema", "topics.sports_entertainment.entertainment.cinema"),
                 ],
             },
-        ],
-        "sources": [
-            ("ESPN Top News", "https://www.espn.com/espn/rss/news", "sports_entertainment.us_sports"),
-            ("Autosport F1", "https://www.autosport.com/rss/f1/news/", "sports_entertainment.motorsports.f1"),
-            ("BBC Sport", "https://feeds.bbci.co.uk/sport/rss.xml", "sports_entertainment.football"),
-            ("Reuters Sport", "https://feeds.reuters.com/reuters/sportsNews", "sports_entertainment.us_sports"),
-            ("Sky Sports", "https://www.skysports.com/rss/12040", "sports_entertainment.football"),
-            ("BBC Premier League", "https://feeds.bbci.co.uk/sport/football/premier-league/rss.xml", "sports_entertainment.football.europe"),
-            ("Guardian Premier League", "https://www.theguardian.com/football/premierleague/rss", "sports_entertainment.football.europe"),
-            ("Guardian La Liga", "https://www.theguardian.com/football/laligafootball/rss", "sports_entertainment.football.europe"),
-            ("Guardian Bundesliga", "https://www.theguardian.com/football/bundesligafootball/rss", "sports_entertainment.football.europe"),
-            ("Guardian Serie A", "https://www.theguardian.com/football/serieafootball/rss", "sports_entertainment.football.europe"),
-            ("Guardian Ligue 1", "https://www.theguardian.com/football/ligue1football/rss", "sports_entertainment.football.europe"),
-            ("BBC Football", "https://feeds.bbci.co.uk/sport/football/rss.xml", "sports_entertainment.football"),
-            ("ESPN Soccer", "https://www.espn.com/espn/rss/soccer/news", "sports_entertainment.football"),
-            ("Guardian Football", "https://www.theguardian.com/football/rss", "sports_entertainment.football"),
-            ("ESPN NBA", "https://www.espn.com/espn/rss/nba/news", "sports_entertainment.us_sports.nba"),
-            ("BBC Basketball", "https://feeds.bbci.co.uk/sport/basketball/rss.xml", "sports_entertainment.us_sports.nba"),
         ],
     },
     {
@@ -417,14 +312,6 @@ CATALOG: list[dict] = [
                 ],
             },
         ],
-        "sources": [
-            ("Phys.org", "https://phys.org/rss-feed/", "science_environment.space"),
-            ("Ars Technica Science", "https://feeds.arstechnica.com/arstechnica/science", "science_environment.space"),
-            ("Ars Technica", "https://feeds.arstechnica.com/arstechnica/index", "science_environment.space"),
-            ("USGS Quakes", "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_week.atom", "science_environment.disasters.quakes"),
-            ("ReliefWeb", "https://reliefweb.int/updates/rss.xml", "science_environment.disasters.aid"),
-            ("NPR News Podcast", "https://feeds.npr.org/500005/podcast.xml", "science_environment.podcasts.news"),
-        ],
     },
     {
         "id": "social_media",
@@ -455,7 +342,6 @@ CATALOG: list[dict] = [
                 ],
             },
         ],
-        "sources": [],
     },
 ]
 
@@ -516,11 +402,24 @@ def seed_topics() -> list[tuple[str, str, str | None, str, int]]:
     return rows
 
 
+DEFAULT_SOURCES: list[tuple[str, str, str]] = [
+    ("BBC News", "https://feeds.bbci.co.uk/news/world/rss.xml", "global_politics.geopolitics"),
+    ("The Guardian", "https://www.theguardian.com/world/rss", "global_politics.geopolitics"),
+    ("The New York Times", "https://rss.nytimes.com/services/xml/rss/nyt/World.xml", "global_politics.geopolitics"),
+    ("Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml", "global_politics.geopolitics"),
+    ("Deutsche Welle (DW)", "https://rss.dw.com/rdf/rss-en-all", "global_politics.geopolitics"),
+    ("France 24", "https://www.france24.com/en/rss", "global_politics.geopolitics"),
+    ("Bloomberg Markets", "https://feeds.bloomberg.com/markets/news.rss", "economy_markets.stocks"),
+    ("CNBC Top News", "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114", "economy_markets.stocks"),
+    ("TechCrunch", "https://techcrunch.com/feed/", "tech_mobility.ai"),
+    ("BBC Sport", "https://feeds.bbci.co.uk/sport/rss.xml", "sports_entertainment.football"),
+]
+
+
 def seed_sources() -> list[tuple[str, str, str, int, None, str]]:
     rows: list[tuple[str, str, str, int, None, str]] = []
-    for module in CATALOG:
-        for name, url, topic_id in module["sources"]:
-            rows.append((module["id"], name, url, 1, None, topic_id))
+    for name, url, topic_id in DEFAULT_SOURCES:
+        rows.append((topic_module_id(topic_id), name, url, 1, None, topic_id))
     return rows
 
 

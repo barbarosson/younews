@@ -39,7 +39,7 @@ class SmokeTests(unittest.TestCase):
         text = "Headline\nhttps://example.com/story\nYou News"
         url = share_url("whatsapp", text, link="https://example.com/story", title="Headline")
         self.assertIn("wa.me", url)
-        self.assertIn("telegram", share_url("telegram", text, link="https://example.com/story", title="Headline"))
+        self.assertIn("t.me/share", share_url("telegram", text, link="https://example.com/story", title="Headline"))
         self.assertIn("twitter.com", share_url("x", text, link="https://example.com/story", title="Headline"))
         self.assertTrue(share_url("email", text, link="https://example.com/story", title="Headline").startswith("mailto:"))
 
