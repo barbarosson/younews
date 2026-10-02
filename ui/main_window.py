@@ -91,11 +91,24 @@ class MainWindow(QMainWindow):
         self.sidebar.setMaximumWidth(280)
         self.article_list.setMinimumWidth(340)
         self.article_list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.article_detail.setMinimumWidth(400)
-        self.article_detail.setMaximumWidth(680)
-        self.article_detail.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self.article_detail.setMinimumWidth(360)
+        self.article_detail.setMinimumHeight(280)
+        self.article_detail.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.chat_panel.setMinimumWidth(0)
-        self.chat_panel.setMaximumWidth(380)
+        self.chat_panel.setMinimumHeight(0)
+        self.chat_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+
+        self.reader_split = QSplitter(Qt.Orientation.Vertical)
+        self.reader_split.setObjectName("readerSplit")
+        self.reader_split.addWidget(self.article_detail)
+        self.reader_split.addWidget(self.chat_panel)
+        self.reader_split.setStretchFactor(0, 3)
+        self.reader_split.setStretchFactor(1, 2)
+        self.reader_split.setChildrenCollapsible(False)
+        self.reader_split.setCollapsible(0, False)
+        self.reader_split.setCollapsible(1, True)
+        self.reader_split.setHandleWidth(6)
+
         self.ticker = TickerBar()
         self.ticker.set_theme(self.db.get_setting("theme"))
         self.market = MarketEngine(self.db, self)
@@ -103,16 +116,16 @@ class MainWindow(QMainWindow):
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.addWidget(self.sidebar)
         self.splitter.addWidget(self.article_list)
-        self.splitter.addWidget(self.article_detail)
-        self.splitter.addWidget(self.chat_panel)
+        self.splitter.addWidget(self.reader_split)
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 3)
-        self.splitter.setStretchFactor(2, 1)
-        self.splitter.setStretchFactor(3, 0)
+        self.splitter.setStretchFactor(2, 2)
         self.splitter.setChildrenCollapsible(False)
         self.splitter.setCollapsible(0, False)
-        self.splitter.setCollapsible(3, True)
+        self.splitter.setCollapsible(1, False)
+        self.splitter.setCollapsible(2, False)
         self.splitter.setSizes(self._balanced_sizes(1280))
+        self.reader_split.setSizes([520, 0])
 
         central = QWidget()
         layout = QVBoxLayout(central)
@@ -549,11 +562,15 @@ class MainWindow(QMainWindow):
     def _toggle_chat(self) -> None:
         visible = not self.chat_panel.isVisible()
         self.chat_panel.setVisible(visible)
-        self.chat_panel.setMinimumWidth(280 if visible else 0)
-        self._balance_panes()
         if visible:
+            self.chat_panel.setMinimumHeight(320)
+            QTimer.singleShot(0, lambda: self._balance_reader_panes(force_open=True))
             self.chat_panel.offer_desk_help()
             self.chat_panel.input.setFocus()
+        else:
+            self.chat_panel.setMinimumHeight(0)
+            height = max(1, sum(self.reader_split.sizes()) or self.reader_split.height())
+            self.reader_split.setSizes([height, 0])
 
     def _open_chat_url(self, url: str) -> None:
         if url.startswith("http://") or url.startswith("https://"):
@@ -1051,19 +1068,15 @@ class MainWindow(QMainWindow):
     def _balanced_sizes(self, total: int | None = None) -> list[int]:
         width = int(total or self.splitter.width() or self.width() or 1280)
         side_on = self.sidebar.isVisible()
-        chat_on = self.chat_panel.isVisible()
         side = min(280, max(240, self.sidebar.minimumSizeHint().width())) if side_on else 0
-        chat = 300 if chat_on else 0
-        rest = max(340 + 400, width - side - chat)
-        detail = min(680, max(420, int(rest * 0.38)))
-        list_w = rest - detail
-        if list_w < 340:
-            list_w = 340
-            detail = max(400, rest - list_w)
-        if detail > 680:
-            list_w += detail - 680
-            detail = 680
-        return [side, list_w, detail, chat]
+        rest = max(340 + 420, width - side)
+        # List takes a bit more than half of the remaining width; reader column the rest.
+        list_w = max(340, int(rest * 0.52))
+        detail = rest - list_w
+        if detail < 420:
+            detail = 420
+            list_w = max(340, rest - detail)
+        return [side, list_w, detail]
 
     def _balance_panes(self) -> None:
         if not hasattr(self, "splitter"):
@@ -1071,12 +1084,29 @@ class MainWindow(QMainWindow):
         target = self._balanced_sizes()
         current = self.splitter.sizes()
         if current and len(current) == len(target) and all(abs(a - b) < 24 for a, b in zip(current, target)):
+            pass
+        else:
+            self.splitter.setSizes(target)
+        if self.chat_panel.isVisible():
+            self._balance_reader_panes()
+
+    def _balance_reader_panes(self, *, force_open: bool = False) -> None:
+        if not hasattr(self, "reader_split") or not self.chat_panel.isVisible():
             return
-        self.splitter.setSizes(target)
+        height = max(1, self.reader_split.height() or sum(self.reader_split.sizes()) or 720)
+        sizes = self.reader_split.sizes()
+        chat_h = sizes[1] if len(sizes) > 1 else 0
+        if force_open or chat_h < 280:
+            # Give the assistant roughly half the reader column so history stays readable.
+            chat = max(360, min(int(height * 0.48), height - 220))
+            detail = max(220, height - chat)
+            self.reader_split.setSizes([detail, chat])
 
     def closeEvent(self, event) -> None:  # noqa: N802
         self.db.set_setting("window_geometry", bytes(self.saveGeometry().toHex()).decode("ascii"))
         self.db.set_setting("splitter_sizes", ",".join(str(value) for value in self.splitter.sizes()))
+        if hasattr(self, "reader_split"):
+            self.db.set_setting("reader_split_sizes", ",".join(str(value) for value in self.reader_split.sizes()))
         from core.app_extras import sync_database_copy
 
         sync_database_copy(self.db.get_setting("sync_folder") or "")

@@ -57,6 +57,44 @@ class DeskStewardTests(unittest.TestCase):
         result = self.handle(self.db, "What is moving global markets today?", t=self.en)
         self.assertFalse(result.get("handled"))
 
+    def test_korea_sites_proposes_pack(self) -> None:
+        result = self.handle(self.db, "bana güney kore için haber sitelerini öner", t=self.en)
+        self.assertTrue(result["handled"])
+        ops = (result.get("pending") or {}).get("ops") or []
+        self.assertEqual(ops[0].get("id"), "kr")
+        self.assertNotIn("Which country", result["reply"])
+
+    def test_headline_question_not_stolen(self) -> None:
+        result = self.handle(self.db, "Güney Kore'de bugün neler oluyor?", t=self.en)
+        self.assertFalse(result.get("handled"))
+
+    def test_argentina_sites_proposes_latam_pack(self) -> None:
+        result = self.handle(self.db, "bana arjantin için haber sitesi öner", t=self.en)
+        self.assertTrue(result["handled"])
+        ops = (result.get("pending") or {}).get("ops") or []
+        self.assertEqual(ops[0].get("id"), "latam")
+        reply = result["reply"].casefold()
+        self.assertTrue("clar" in reply or "nación" in reply or "nacion" in reply or "latin" in reply)
+
+    def test_unknown_country_advice_left_to_ai(self) -> None:
+        result = self.handle(self.db, "bana norveç için haber sitesi öner", t=self.en)
+        self.assertFalse(result.get("handled"))
+
+    def test_pack_count_cap(self) -> None:
+        from core.source_packs import PACK_ORDER, SOURCE_PACKS
+
+        self.assertLessEqual(len(PACK_ORDER), 20)
+        self.assertEqual(set(PACK_ORDER), set(SOURCE_PACKS))
+
+    def test_brazil_agencies_recommends_brazil_not_turkey(self) -> None:
+        result = self.handle(self.db, "brezilya haber ajanslarından hangisini önerirsin", t=self.en)
+        self.assertTrue(result["handled"])
+        ops = (result.get("pending") or {}).get("ops") or []
+        self.assertEqual(ops[0].get("id"), "br")
+        reply = result["reply"].casefold()
+        self.assertTrue("folha" in reply or "brasil" in reply or "g1" in reply)
+        self.assertNotIn("anadolu", reply)
+
 
 if __name__ == "__main__":
     unittest.main()

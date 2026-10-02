@@ -1,4 +1,4 @@
-"""News-only assistant: retrieve stored headlines and answer from that catalog."""
+"""News desk assistant: free advice on outlets + grounded answers from stored headlines."""
 
 from __future__ import annotations
 
@@ -11,13 +11,16 @@ from database.db import Database
 from database.models import Article
 
 CHAT_SYSTEM = (
-    "You are You News, a news-desk assistant. You may ONLY discuss news, markets, "
-    "geopolitics, sports headlines, science/tech news, the provided articles, "
-    "country/topic source packs, social follows (YouTube/Substack/Bluesky), "
-    "ticker symbols on the market tape, and adding user-supplied news site or RSS URLs. "
-    "If the user asks for recipes, homework, coding unrelated to news, medical advice, "
-    "personal life, or anything outside news, set in_scope=false and politely refuse. "
-    "Never invent headlines, URLs, or article ids. Use only the catalog and import results. "
+    "You are You News, a news-desk editor. Answer like a normal knowledgeable assistant "
+    "whenever the topic is news media, outlets, agencies, countries, beats, markets, "
+    "geopolitics, sports, or science/tech. Give opinions and comparisons freely. "
+    "You may recommend well-known newspapers and agencies for ANY country or topic "
+    "(Argentina, Chile, Nigeria, etc.) even when they are not in a source pack. "
+    "Refuse only clearly off-topic asks (recipes, homework, medical advice, unrelated coding, personal life). "
+    "Never invent today's headlines, quotes, dates, or article ids — those come only from the catalog. "
+    "Never answer Country A with an unrelated Country B pack list. "
+    "If a matching source pack exists, mention it and set propose_pack_id so the user can say yes to add feeds. "
+    "Only put an RSS URL in the reply if it appears in the source-pack list. "
     "Always reply with compact JSON."
 )
 
@@ -28,6 +31,16 @@ _STOP = {
     "hakkında", "goster", "göster", "ac", "aç", "ozet", "özet", "özetle", "ozetle",
     "haber", "haberler", "bana", "olan", "hangi", "nasil", "nasıl",
 }
+
+_OUTLET_ADVICE = re.compile(
+    r"\b("
+    r"öner\w*|oner\w*|suggest|recommend|tavsiye|"
+    r"ajans\w*|agenc\w*|haber sitesi|news site|outlet|gazete|"
+    r"hangi.*(kaynak|site|ajans)|which.*(source|outlet|agency)|"
+    r"kaynak öner|site öner"
+    r")\b",
+    re.I,
+)
 
 
 def answer_news_chat(
@@ -51,14 +64,26 @@ def answer_news_chat(
         desk = handle_desk(db, text, t=translator, pending=pending)
         if desk.get("handled"):
             return desk
-    catalog = _retrieve(db, text, selected, date_order=date_order)
+
+    advice = _is_outlet_advice(text)
+    catalog = [] if advice else _retrieve(db, text, selected, date_order=date_order)
+    if not advice and selected and selected not in catalog:
+        catalog = [selected] + catalog
     allowed_ids = {article.id for article in catalog}
     allowed_urls = {str(article.link).strip() for article in catalog if article.link}
 
-    prompt = _build_prompt(text, language_name, catalog, history or [], selected, imported)
+    prompt = _build_prompt(
+        text,
+        language_name,
+        catalog,
+        history or [],
+        selected,
+        imported,
+        outlet_advice=advice,
+    )
     raw = generate_raw(db, prompt, timeout=90.0, system=CHAT_SYSTEM)
     parsed = _parse_chat_json(raw)
-    in_scope = bool(parsed.get("in_scope", True)) or bool(imported)
+    in_scope = bool(parsed.get("in_scope", True)) or bool(imported) or advice
     reply = str(parsed.get("reply") or "").strip()
     if not in_scope:
         return {
@@ -73,7 +98,7 @@ def answer_news_chat(
         }
 
     article_ids = _filter_ids(parsed.get("article_ids"), allowed_ids)
-    if not article_ids:
+    if not article_ids and not advice:
         article_ids = [article.id for article in catalog[:12]]
     open_id = _as_int(parsed.get("open_article_id"))
     if open_id not in allowed_ids:
@@ -91,6 +116,18 @@ def answer_news_chat(
             open_url = None
     if open_id is None and _wants_open(text) and selected:
         open_id = selected.id
+
+    pending_out = None
+    pack_id = _safe_pack_id(parsed.get("propose_pack_id"))
+    if pack_id and translator is not None:
+        from core.desk_steward import propose_pack_pending
+
+        pending_out = propose_pack_pending(pack_id)
+        if advice and pack_id:
+            hint = translator("chat.confirm_hint")
+            if hint and hint not in reply:
+                reply = f"{reply}\n\n{hint}".strip()
+
     return {
         "in_scope": True,
         "reply": reply,
@@ -100,7 +137,19 @@ def answer_news_chat(
         "summarize_article_id": summarize_id,
         "suggestions": _clean_suggestions(parsed.get("suggestions")),
         "imported_sources": imported,
+        "pending": pending_out,
     }
+
+
+def _is_outlet_advice(message: str) -> bool:
+    return bool(_OUTLET_ADVICE.search(message or ""))
+
+
+def _safe_pack_id(value: object) -> str | None:
+    from core.source_packs import SOURCE_PACKS
+
+    pack_id = str(value or "").strip().lower()
+    return pack_id if pack_id in SOURCE_PACKS else None
 
 
 def _extract_urls(message: str) -> list[str]:
@@ -186,6 +235,8 @@ def _build_prompt(
     history: list[dict[str, str]],
     selected: Article | None,
     imported: list[dict] | None = None,
+    *,
+    outlet_advice: bool = False,
 ) -> str:
     lines = []
     for article in catalog:
@@ -215,23 +266,37 @@ def _build_prompt(
             f"headlines={item.get('count')} | error={item.get('error') or 'none'}"
         )
     import_text = "\n".join(import_lines) if import_lines else "(none)"
+    from core.source_packs import SOURCE_PACKS
+
+    pack_lines = []
+    for pack_id, items in SOURCE_PACKS.items():
+        names = ", ".join(name for _m, _t, name, _u in items)
+        pack_lines.append(f"- {pack_id}: {names}")
+    packs_text = "\n".join(pack_lines)
+    mode = (
+        "MODE: outlet recommendation. Answer like a standard AI news editor. "
+        "Recommend concrete newspapers/agencies for the country or beat the user named. "
+        "Explain briefly why. If a pack id matches that country/topic, set propose_pack_id to that id "
+        "and invite the user to say yes so feeds are added. Leave article_ids empty. "
+        "Do not refuse for lack of a pack. Do not list an unrelated country.\n"
+        if outlet_advice
+        else "MODE: news Q&A from the catalog when possible; still answer media questions freely.\n"
+    )
     return (
         f"Write reply in {language_name}.\n"
+        f"{mode}"
         "Return JSON only with keys:\n"
-        "- in_scope: boolean\n"
-        "- reply: helpful answer grounded in the catalog and import results; if in_scope is false, a short polite refusal\n"
-        "- article_ids: array of catalog ids the user should see (empty if refusing)\n"
-        "- open_article_id: catalog id to open in the reader, or null\n"
-        "- open_url: exact catalog url to open in the browser, or null\n"
-        "- summarize_article_id: catalog id to run the built-in AI summary on, or null\n"
-        "- suggestions: 3 short follow-up news questions\n"
-        "If the user asks to summarize, set summarize_article_id. "
-        "If they ask to open a story or its link, set open_article_id and/or open_url. "
-        "If they ask to see related news, fill article_ids. Suggest further news angles. "
-        "If a news site or RSS URL was imported, confirm it and mention how many headlines were stored. "
-        "Adding a news feed URL is in scope.\n\n"
+        "- in_scope: boolean (true for any news/media/outlet question)\n"
+        "- reply: direct useful answer\n"
+        "- article_ids: catalog ids to show (empty for pure outlet advice)\n"
+        "- open_article_id: catalog id or null\n"
+        "- open_url: exact catalog url or null\n"
+        "- summarize_article_id: catalog id or null\n"
+        "- propose_pack_id: pack id from the list if the user should be offered that pack, else null\n"
+        "- suggestions: 3 short follow-ups\n\n"
         f"Selected story: {selected_line}\n\n"
         f"Imported feeds:\n{import_text}\n\n"
+        f"Source packs (only these can be one-click added):\n{packs_text}\n\n"
         f"Recent chat:\n{history_text}\n\n"
         f"Catalog:\n{catalog_text}\n\n"
         f"User: {message}"

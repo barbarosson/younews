@@ -48,6 +48,12 @@ class SocialFollowsTab(QWidget):
         self.test_btn.setObjectName("ghostButton")
         self.remove_btn = QPushButton()
         self.remove_btn.setObjectName("ghostButton")
+        self.select_all_btn = QPushButton()
+        self.select_all_btn.setObjectName("ghostButton")
+        self.select_none_btn = QPushButton()
+        self.select_none_btn.setObjectName("ghostButton")
+        self.remove_all_btn = QPushButton()
+        self.remove_all_btn.setObjectName("ghostButton")
         self.test_log_label = QLabel()
         self.test_log = QPlainTextEdit()
         self.test_log.setObjectName("sourceTestLog")
@@ -55,7 +61,7 @@ class SocialFollowsTab(QWidget):
         self.test_log.setMaximumHeight(160)
         self.table = QTableWidget(0, 3)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.verticalHeader().setVisible(False)
         header = self.table.horizontalHeader()
@@ -66,6 +72,11 @@ class SocialFollowsTab(QWidget):
         row = QHBoxLayout()
         row.addWidget(self.platform)
         row.addWidget(self.handle, 1)
+        selection = FlowLayout()
+        selection.addWidget(self.select_all_btn)
+        selection.addWidget(self.select_none_btn)
+        selection.addWidget(self.remove_btn)
+        selection.addWidget(self.remove_all_btn)
         actions = FlowLayout()
         actions.addWidget(self.test_btn)
         actions.addWidget(self.add_btn)
@@ -75,14 +86,17 @@ class SocialFollowsTab(QWidget):
         layout.addWidget(self.limit_label)
         layout.addLayout(row)
         layout.addLayout(actions)
+        layout.addLayout(selection)
         layout.addWidget(self.table, 1)
-        layout.addWidget(self.remove_btn, 0, Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(self.test_log_label)
         layout.addWidget(self.test_log)
 
         self.add_btn.clicked.connect(self._add)
         self.test_btn.clicked.connect(self._test)
         self.remove_btn.clicked.connect(self._remove)
+        self.select_all_btn.clicked.connect(self._select_all)
+        self.select_none_btn.clicked.connect(self._select_none)
+        self.remove_all_btn.clicked.connect(self._remove_all)
         self.handle.returnPressed.connect(self._add)
         self.table.itemSelectionChanged.connect(self._sync_remove)
         self.platform.currentIndexChanged.connect(self._on_platform)
@@ -96,7 +110,10 @@ class SocialFollowsTab(QWidget):
         self.add_btn.setText(self._i18n.t("social.add"))
         self.test_btn.setText(self._i18n.t("social.test"))
         self.test_log_label.setText(self._i18n.t("social.test_log"))
-        self.remove_btn.setText(self._i18n.t("social.remove"))
+        self.select_all_btn.setText(self._i18n.t("app.select_all"))
+        self.select_none_btn.setText(self._i18n.t("app.select_none"))
+        self.remove_btn.setText(self._i18n.t("social.remove_selected"))
+        self.remove_all_btn.setText(self._i18n.t("social.remove_all"))
         self.table.setHorizontalHeaderLabels(
             [
                 self._i18n.t("social.col_platform"),
@@ -171,17 +188,40 @@ class SocialFollowsTab(QWidget):
         self.handle.setPlaceholderText(self._i18n.t(f"social.placeholder.{platform}"))
 
     def _sync_remove(self) -> None:
-        self.remove_btn.setEnabled(self._selected_id() is not None)
+        ids = self._selected_ids()
+        self.remove_btn.setEnabled(bool(ids))
+        self.select_all_btn.setEnabled(self.table.rowCount() > 0)
+        self.select_none_btn.setEnabled(bool(ids))
+        self.remove_all_btn.setEnabled(self._follow_count() > 0)
+
+    def _selected_ids(self) -> list[int]:
+        ids: list[int] = []
+        seen: set[int] = set()
+        for index in self.table.selectionModel().selectedRows():
+            item = self.table.item(index.row(), 2)
+            if item is None:
+                continue
+            value = item.data(Qt.ItemDataRole.UserRole)
+            if value is None:
+                continue
+            sid = int(value)
+            if sid in seen:
+                continue
+            seen.add(sid)
+            ids.append(sid)
+        return ids
 
     def _selected_id(self) -> int | None:
-        row = self.table.currentRow()
-        if row < 0:
-            return None
-        item = self.table.item(row, 2)
-        if item is None:
-            return None
-        value = item.data(Qt.ItemDataRole.UserRole)
-        return int(value) if value is not None else None
+        ids = self._selected_ids()
+        return ids[0] if ids else None
+
+    def _select_all(self) -> None:
+        self.table.selectAll()
+        self._sync_remove()
+
+    def _select_none(self) -> None:
+        self.table.clearSelection()
+        self._sync_remove()
 
     def _test(self) -> None:
         target = self._resolve_target()
@@ -301,10 +341,45 @@ class SocialFollowsTab(QWidget):
         self.reload()
 
     def _remove(self) -> None:
-        source_id = self._selected_id()
-        if source_id is None:
+        ids = self._selected_ids()
+        if not ids:
             return
-        if self._db.delete_user_source(source_id):
+        if len(ids) > 1:
+            answer = QMessageBox.question(
+                self,
+                self._i18n.t("social.title"),
+                self._i18n.t("social.remove_selected_confirm").replace("{count}", str(len(ids))),
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        removed = 0
+        for source_id in ids:
+            if self._db.delete_user_source(source_id):
+                removed += 1
+        if removed:
+            self._mark_changed()
+            self.reload()
+
+    def _remove_all(self) -> None:
+        ids = [
+            source.id
+            for source in self._db.list_sources(active_only=False)
+            if source.module_id == SOCIAL_MODULE_ID and source.user_added
+        ]
+        if not ids:
+            return
+        answer = QMessageBox.question(
+            self,
+            self._i18n.t("social.title"),
+            self._i18n.t("social.remove_all_confirm").replace("{count}", str(len(ids))),
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        removed = 0
+        for source_id in ids:
+            if self._db.delete_user_source(source_id):
+                removed += 1
+        if removed:
             self._mark_changed()
             self.reload()
 

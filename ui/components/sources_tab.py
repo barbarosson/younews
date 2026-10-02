@@ -46,7 +46,7 @@ class SourcesTab(QWidget):
 
         self.table = QTableWidget(0, 6)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.verticalHeader().setVisible(False)
         self.table.setAlternatingRowColors(True)
@@ -84,6 +84,12 @@ class SourcesTab(QWidget):
         self.test_btn.setObjectName("ghostButton")
         self.remove_btn = QPushButton()
         self.remove_btn.setObjectName("ghostButton")
+        self.select_all_btn = QPushButton()
+        self.select_all_btn.setObjectName("ghostButton")
+        self.select_none_btn = QPushButton()
+        self.select_none_btn.setObjectName("ghostButton")
+        self.remove_all_btn = QPushButton()
+        self.remove_all_btn.setObjectName("ghostButton")
         self.mute_btn = QPushButton()
         self.mute_btn.setObjectName("ghostButton")
         self.discover_btn = QPushButton()
@@ -107,10 +113,14 @@ class SourcesTab(QWidget):
         form.addRow(self.css_label, self.css_edit)
 
         self.refresh_edit.setMaximumWidth(72)
+        selection = FlowLayout()
+        selection.addWidget(self.select_all_btn)
+        selection.addWidget(self.select_none_btn)
+        selection.addWidget(self.remove_btn)
+        selection.addWidget(self.remove_all_btn)
         buttons = FlowLayout()
         buttons.addWidget(self.add_btn)
         buttons.addWidget(self.test_btn)
-        buttons.addWidget(self.remove_btn)
         buttons.addWidget(self.mute_btn)
         buttons.addWidget(self.discover_btn)
         buttons.addWidget(self.refresh_edit)
@@ -120,6 +130,7 @@ class SourcesTab(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.addWidget(self.hint)
+        layout.addLayout(selection)
         layout.addWidget(self.table, 1)
         layout.addLayout(form)
         layout.addLayout(buttons)
@@ -133,6 +144,9 @@ class SourcesTab(QWidget):
         self.add_btn.clicked.connect(self._add_source)
         self.test_btn.clicked.connect(self._test_form_source)
         self.remove_btn.clicked.connect(self._remove_source)
+        self.select_all_btn.clicked.connect(self._select_all)
+        self.select_none_btn.clicked.connect(self._select_none)
+        self.remove_all_btn.clicked.connect(self._remove_all_user)
         self.mute_btn.clicked.connect(self._mute_source)
         self.discover_btn.clicked.connect(self._discover)
         self.opml_import.clicked.connect(self._import_opml)
@@ -173,7 +187,10 @@ class SourcesTab(QWidget):
         self.css_edit.setPlaceholderText(self._i18n.t("sources.css_hint"))
         self.add_btn.setText(self._i18n.t("sources.add"))
         self.test_btn.setText(self._i18n.t("sources.test"))
-        self.remove_btn.setText(self._i18n.t("sources.remove"))
+        self.select_all_btn.setText(self._i18n.t("app.select_all"))
+        self.select_none_btn.setText(self._i18n.t("app.select_none"))
+        self.remove_btn.setText(self._i18n.t("sources.remove_selected"))
+        self.remove_all_btn.setText(self._i18n.t("sources.remove_all"))
         self.mute_btn.setText(self._i18n.t("sources.mute"))
         self.discover_btn.setText(self._i18n.t("sources.discover"))
         self.test_log_label.setText(self._i18n.t("sources.test_log"))
@@ -288,20 +305,52 @@ class SourcesTab(QWidget):
         html = self.kind_combo.currentData() == "scraper"
         self.css_edit.setEnabled(html)
 
+    def _selected_rows(self) -> list[tuple[int, bool]]:
+        rows: list[tuple[int, bool]] = []
+        seen: set[int] = set()
+        for index in self.table.selectionModel().selectedRows():
+            item = self.table.item(index.row(), 0)
+            if item is None:
+                continue
+            source_id = item.data(Qt.ItemDataRole.UserRole)
+            if source_id is None:
+                continue
+            sid = int(source_id)
+            if sid in seen:
+                continue
+            seen.add(sid)
+            rows.append((sid, bool(item.data(Qt.ItemDataRole.UserRole + 1))))
+        return rows
+
     def _selected_source(self) -> tuple[int | None, bool]:
-        row = self.table.currentRow()
-        if row < 0:
+        rows = self._selected_rows()
+        if not rows:
             return None, False
-        item = self.table.item(row, 0)
-        if item is None:
-            return None, False
-        source_id = item.data(Qt.ItemDataRole.UserRole)
-        user_added = bool(item.data(Qt.ItemDataRole.UserRole + 1))
-        return (int(source_id) if source_id is not None else None), user_added
+        return rows[0]
 
     def _on_selection(self) -> None:
-        source_id, user_added = self._selected_source()
-        self.remove_btn.setEnabled(bool(source_id) and user_added)
+        rows = self._selected_rows()
+        deletable = sum(1 for _sid, user_added in rows if user_added)
+        self.remove_btn.setEnabled(deletable > 0)
+        self.select_all_btn.setEnabled(self.table.rowCount() > 0)
+        self.select_none_btn.setEnabled(bool(rows))
+        self.remove_all_btn.setEnabled(self._user_source_count() > 0)
+        self.mute_btn.setEnabled(bool(rows))
+
+    def _user_source_count(self) -> int:
+        return sum(
+            1
+            for source in self._db.list_sources(active_only=False)
+            if source.module_id != SOCIAL_MODULE_ID and source.user_added
+        )
+
+    def _select_all(self) -> None:
+        self.table.selectAll()
+        self._on_selection()
+
+    def _select_none(self) -> None:
+        self.table.clearSelection()
+        self._on_selection()
 
     def _on_item_changed(self, item: QTableWidgetItem) -> None:
         if item.column() != 0:
@@ -423,30 +472,71 @@ class SourcesTab(QWidget):
         QMessageBox.warning(self, title, message)
 
     def _remove_source(self) -> None:
-        source_id, user_added = self._selected_source()
-        if source_id is None:
+        rows = self._selected_rows()
+        deletable = [sid for sid, user_added in rows if user_added]
+        if not deletable:
             QMessageBox.information(self, self._i18n.t("sources.title"), self._i18n.t("sources.select_first"))
             return
-        if not user_added:
-            QMessageBox.information(self, self._i18n.t("sources.title"), self._i18n.t("sources.cannot_delete_seed"))
+        skipped = sum(1 for _sid, user_added in rows if not user_added)
+        if len(deletable) > 1:
+            answer = QMessageBox.question(
+                self,
+                self._i18n.t("sources.title"),
+                self._i18n.t("sources.remove_selected_confirm").replace("{count}", str(len(deletable))),
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        removed = 0
+        for source_id in deletable:
+            if self._db.delete_user_source(source_id):
+                removed += 1
+        if removed:
+            self._mark_changed()
+            self.reload()
+        if skipped:
+            QMessageBox.information(
+                self,
+                self._i18n.t("sources.title"),
+                self._i18n.t("sources.cannot_delete_seed_bulk").replace("{count}", str(skipped)),
+            )
+
+    def _remove_all_user(self) -> None:
+        ids = [
+            source.id
+            for source in self._db.list_sources(active_only=False)
+            if source.module_id != SOCIAL_MODULE_ID and source.user_added
+        ]
+        if not ids:
             return
-        if self._db.delete_user_source(source_id):
+        answer = QMessageBox.question(
+            self,
+            self._i18n.t("sources.title"),
+            self._i18n.t("sources.remove_all_confirm").replace("{count}", str(len(ids))),
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        removed = 0
+        for source_id in ids:
+            if self._db.delete_user_source(source_id):
+                removed += 1
+        if removed:
             self._mark_changed()
             self.reload()
 
     def _mute_source(self) -> None:
-        source_id, _user = self._selected_source()
-        if source_id is None:
+        rows = self._selected_rows()
+        if not rows:
             QMessageBox.information(self, self._i18n.t("sources.title"), self._i18n.t("sources.select_first"))
             return
-        self._db.mute_source(source_id, 24)
         minutes = 0
         try:
             minutes = int(self.refresh_edit.text() or 0)
         except ValueError:
             minutes = 0
-        if minutes:
-            self._db.set_source_refresh_minutes(source_id, minutes)
+        for source_id, _user in rows:
+            self._db.mute_source(source_id, 24)
+            if minutes:
+                self._db.set_source_refresh_minutes(source_id, minutes)
         self._mark_changed()
         self.reload()
 

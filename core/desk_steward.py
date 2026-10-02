@@ -18,32 +18,30 @@ from database.db import Database, DuplicateSourceError
 PACK_ALIASES: dict[str, tuple[str, ...]] = {
     "tr": ("tr", "turkiye", "turkiye haberi", "turk", "turkish", "istanbul"),
     "us": ("us", "usa", "abd", "amerika", "american"),
-    "eu": ("eu", "avrupa", "europe", "european"),
     "uk": ("uk", "ingiltere", "britain", "british", "london"),
     "de": ("de", "almanya", "germany", "german"),
     "fr": ("fr", "fransa", "france", "french"),
     "jp": ("jp", "japonya", "japan", "japanese"),
+    "kr": ("kr", "kore", "korea", "guney kore", "south korea", "seoul", "hanguk"),
+    "in": ("hindistan", "india", "indian", "mumbai", "delhi"),
+    "cn": ("cin", "china", "chinese", "pekin", "beijing", "scmp"),
+    "br": ("brezilya", "brazil", "brasil", "sao paulo", "rio"),
+    "eu": ("eu", "avrupa", "europe", "european"),
+    "asia": ("asya", "asia", "asian", "guneydogu asya"),
+    "latam": (
+        "latam", "latin", "latin amerika", "latin america", "guney amerika",
+        "south america", "arjantin", "argentina", "meksika", "mexico",
+    ),
+    "africa": ("afrika", "africa", "african", "nigeria", "kenya", "egypt", "misir"),
+    "me": ("orta dogu", "middle east", "mena", "golfe", "iran", "irak", "saudi", "israil", "israel"),
     "tech": ("tech", "teknoloji", "technology", "gadget"),
     "science": ("science", "bilim", "uzay", "space"),
     "crypto": ("crypto", "kripto", "bitcoin", "web3"),
     "sport": ("sport", "spor", "football", "futbol"),
-    "mastodon": ("mastodon", "newsletter", "bulten"),
+    "politics": ("politics", "siyaset", "politika", "geopolitik", "geopolitics"),
 }
 
-PACK_TITLE_KEY = {
-    "tr": "sources.pack_tr",
-    "us": "sources.pack_us",
-    "eu": "sources.pack_eu",
-    "uk": "sources.pack_uk",
-    "de": "sources.pack_de",
-    "fr": "sources.pack_fr",
-    "jp": "sources.pack_jp",
-    "tech": "sources.pack_tech",
-    "science": "sources.pack_science",
-    "crypto": "sources.pack_crypto",
-    "sport": "sources.pack_sport",
-    "mastodon": "sources.pack_mastodon",
-}
+PACK_TITLE_KEY = {pack_id: f"sources.pack_{pack_id}" for pack_id in PACK_ALIASES}
 
 SOCIAL_SUGGESTIONS: tuple[tuple[str, str, str], ...] = (
     ("youtube", "@BBCNews", "BBC News"),
@@ -59,12 +57,14 @@ _CONFIRM = re.compile(
 _REJECT = re.compile(r"\b(hayir|hayır|no|iptal|vazgec|vazgeç|cancel|forget)\b", re.I)
 _ADD = re.compile(r"\b(ekle|add|follow|takip|seride|şeride|watchlist)\b", re.I)
 _REMOVE = re.compile(r"\b(sil|cikar|çıkar|remove|delete|unfollow|birak|bırak|drop)\b", re.I)
-_PROPOSE = re.compile(r"\b(oner|öner|suggest|recommend|hangi|what pack|ne ekleyeyim)\b", re.I)
+_PROPOSE = re.compile(r"\b(oner\w*|öner\w*|suggest|recommend|tavsiye|what pack|ne ekleyeyim)\b", re.I)
 _DESK = re.compile(
     r"\b(kaynak|source|rss|paket|pack|serit|şerit|ticker|sembol|youtube|substack|bluesky|"
-    r"takip|follow|sosyal|social|ulke|ülke|dal|branch|feed|besleme)\b",
+    r"takip|follow|sosyal|social|ulke|ülke|dal|branch|feed|besleme|"
+    r"site|siteleri|sitelerini|outlet|gazete|seride|şeride|ajans|agency|agencies)\b",
     re.I,
 )
+_MARKET = re.compile(r"\b(ticker|sembol|endeks|bist|nasdaq|kospi|dax|altin|altın)\b", re.I)
 _TAPE_HIDE = re.compile(r"\b(seridi gizle|şeridi gizle|hide tape|hide the tape)\b", re.I)
 _TAPE_SHOW = re.compile(r"\b(seridi goster|şeridi göster|show tape|show the tape)\b", re.I)
 _REFRESH = re.compile(r"\b(beslemeleri yenile|refresh feeds|yenile)\b", re.I)
@@ -156,15 +156,33 @@ def handle_desk(
         return _propose(pending_batch, t)
     if pack_id:
         return _propose({"ops": [{"op": "pack", "id": pack_id}]}, t)
-    return _result(t("chat.desk_ask"), suggestions=_default_suggestions(t))
+    return {"handled": False}
 
 
 def _is_desk_intent(folded: str, pending: dict | None) -> bool:
+    """Only claim the turn when we can act (known pack / ticker / social / remove).
+
+    Pure outlet-advice questions without a known pack go to the free AI chat.
+    """
     if pending and (_is_confirm(folded) or _REJECT.search(folded)):
         return True
-    if _DESK.search(folded) or _PROPOSE.search(folded) or _ADD.search(folded) or _REMOVE.search(folded):
+    pack = _detect_pack(folded) is not None
+    market = bool(_MARKET.search(folded))
+    social = bool(re.search(r"\b(youtube|substack|bluesky|sosyal|social)\b", folded))
+    remove = bool(_REMOVE.search(folded))
+    add = bool(_ADD.search(folded))
+    propose = bool(_PROPOSE.search(folded))
+    if pack and (propose or add or remove or _DESK.search(folded)):
         return True
-    return _detect_pack(folded) is not None
+    if market and (add or remove or propose):
+        return True
+    if social and (add or remove or propose):
+        return True
+    if remove and _DESK.search(folded):
+        return True
+    if add and _DESK.search(folded) and not propose:
+        return True
+    return False
 
 
 def _is_confirm(folded: str) -> bool:
@@ -249,10 +267,28 @@ def _remove_op(source) -> dict:
     }
 
 
+def propose_pack_pending(pack_id: str) -> dict:
+    return {"ops": [{"op": "pack", "id": pack_id}]}
+
+
 def _propose(pending: dict, t) -> dict:
-    lines = [t("chat.propose_intro")]
+    lines: list[str] = []
     for op in pending.get("ops") or []:
-        lines.append(f"• {_op_label(op, t)}")
+        if op.get("op") == "pack":
+            why = t(f"chat.pack_why.{op.get('id')}", "")
+            if why and not why.startswith("chat.pack_why."):
+                lines.append(why)
+            names = [name for _m, _top, name, _u in SOURCE_PACKS.get(str(op.get("id") or ""), [])]
+            if names:
+                lines.append("• " + " · ".join(names))
+            else:
+                lines.append(f"• {_op_label(op, t)}")
+        else:
+            if not lines:
+                lines.append(t("chat.propose_intro"))
+            lines.append(f"• {_op_label(op, t)}")
+    if not lines:
+        lines.append(t("chat.propose_intro"))
     lines.append(t("chat.confirm_hint"))
     return _result(
         "\n".join(lines),

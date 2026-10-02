@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from config import DEFAULT_THEME, normalize_theme
 from core.i18n_manager import I18nManager
+from ui.flow_layout import FlowLayout
 
 ROLE_USER = "user"
 ROLE_ASSISTANT = "assistant"
@@ -37,6 +38,7 @@ class ChatPanel(QFrame):
         self._history: list[dict[str, str]] = []
         self._busy = False
         self._theme = normalize_theme(db.get_setting("theme", DEFAULT_THEME) if db else DEFAULT_THEME)
+        self._suggestion_buttons: list[tuple[QPushButton, str]] = []
 
         self.title_label = QLabel()
         self.title_label.setObjectName("paneTitle")
@@ -47,27 +49,34 @@ class ChatPanel(QFrame):
         self.log.setObjectName("chatLog")
         self.log.setOpenExternalLinks(False)
         self.log.setOpenLinks(False)
+        self.log.setMinimumHeight(160)
+        self.log.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.input = QLineEdit()
         self.send_btn = QPushButton()
         self.clear_btn = QPushButton()
         self.clear_btn.setObjectName("ghostButton")
         self.suggestions = QWidget()
-        self.suggestions_layout = QVBoxLayout(self.suggestions)
+        self.suggestions.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        self.suggestions_layout = FlowLayout(self.suggestions, spacing=6)
         self.suggestions_layout.setContentsMargins(0, 0, 0, 0)
-        self.suggestions_layout.setSpacing(4)
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.addWidget(self.title_label, 1)
+        header.addWidget(self.clear_btn, 0, Qt.AlignmentFlag.AlignRight)
 
         row = QHBoxLayout()
         row.addWidget(self.input, 1)
         row.addWidget(self.send_btn)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.addWidget(self.title_label)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(6)
+        layout.addLayout(header)
         layout.addWidget(self.hint_label)
         layout.addWidget(self.log, 1)
         layout.addWidget(self.suggestions)
         layout.addLayout(row)
-        layout.addWidget(self.clear_btn, 0, Qt.AlignmentFlag.AlignLeft)
 
         self.send_btn.clicked.connect(self._submit)
         self.input.returnPressed.connect(self._submit)
@@ -148,20 +157,12 @@ class ChatPanel(QFrame):
             button.setObjectName("ghostButton")
             button.setCursor(Qt.CursorShape.PointingHandCursor)
             button.setToolTip(text)
-            button.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+            button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+            button.setMinimumHeight(28)
             button.clicked.connect(lambda _checked=False, value=text: self._use_suggestion(value))
             self.suggestions_layout.addWidget(button)
             self._suggestion_buttons.append((button, text))
-        self._elide_suggestions()
-
-    def _elide_suggestions(self) -> None:
-        for button, text in getattr(self, "_suggestion_buttons", []):
-            room = max(40, self.width() - 52)
-            button.setText(button.fontMetrics().elidedText(text, Qt.TextElideMode.ElideRight, room))
-
-    def resizeEvent(self, event) -> None:  # noqa: N802
-        super().resizeEvent(event)
-        self._elide_suggestions()
+        self.suggestions.setVisible(bool(items))
 
     def set_theme(self, theme: str | None) -> None:
         self._theme = normalize_theme(theme)
@@ -196,6 +197,7 @@ class ChatPanel(QFrame):
             QDesktopServices.openUrl(url)
 
     def _render(self) -> None:
+        self.hint_label.setVisible(not self._history)
         if not self._history:
             html = (
                 f"<p class='welcome'><b>{escape(self._i18n.t('chat.welcome'))}</b></p>"

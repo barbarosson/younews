@@ -128,14 +128,15 @@ class SettingsDialog(QDialog):
         self.start_windows = QCheckBox()
         self.notify_alerts = QCheckBox()
         self.pack_buttons: dict[str, QPushButton] = {}
-        for pack_id in ("tr", "us", "eu", "uk", "de", "fr", "jp", "tech", "science", "crypto", "sport", "mastodon"):
+        from core.source_packs import PACK_ORDER
+
+        for pack_id in PACK_ORDER:
             button = QPushButton()
             button.setObjectName("ghostButton")
             self.pack_buttons[pack_id] = button
         self.pack_tr = self.pack_buttons["tr"]
         self.pack_us = self.pack_buttons["us"]
         self.pack_eu = self.pack_buttons["eu"]
-        self.pack_mastodon = self.pack_buttons["mastodon"]
         self.backup_btn = QPushButton()
         self.restore_btn = QPushButton()
         self.backup_btn.setObjectName("ghostButton")

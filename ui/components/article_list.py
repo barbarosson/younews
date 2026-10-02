@@ -39,6 +39,7 @@ ROLE_EMOJI = Qt.ItemDataRole.UserRole + 7
 ROLE_SAVED = Qt.ItemDataRole.UserRole + 8
 ROLE_COMPACT = Qt.ItemDataRole.UserRole + 9
 ROLE_LOW_DATA = Qt.ItemDataRole.UserRole + 10
+ROLE_PICKED = Qt.ItemDataRole.UserRole + 11
 
 MODULE_COLORS = {
     "economy_markets": QColor("#238636"),
@@ -99,15 +100,26 @@ class ArticleCardDelegate(QStyledItemDelegate):
         path = QPainterPath()
         path.addRoundedRect(QRectF(rect), 10, 10)
         painter.fillPath(path, fill)
-        if hovered or selected or pressed:
-            ring = accent.lighter(130) if selected or pressed else QColor(accent.red(), accent.green(), accent.blue(), 140)
-            painter.setPen(QPen(ring, 3 if selected or pressed else 1))
+        picked = bool(index.data(ROLE_PICKED))
+        if hovered or selected or pressed or picked:
+            ring = accent.lighter(130) if selected or pressed or picked else QColor(accent.red(), accent.green(), accent.blue(), 140)
+            painter.setPen(QPen(ring, 3 if selected or pressed or picked else 1))
             painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 10, 10)
         if not is_read:
             painter.setPen(QPen(accent, 5 if selected else 3))
             painter.drawLine(rect.left() + 3, rect.top() + 10, rect.left() + 3, rect.bottom() - 10)
 
-        thumb = QRect(rect.left() + 10, rect.top() + 10, 40 if compact else 112, 36 if compact else 76)
+        box = _checkbox_rect(rect, compact)
+        painter.setPen(QPen(accent if picked else QColor("#8b949e") if fill.lightness() < 140 else QColor("#656d76"), 1.6))
+        painter.setBrush(accent if picked else QColor(255, 255, 255, 0))
+        painter.drawRoundedRect(box, 4, 4)
+        if picked:
+            painter.setPen(QPen(QColor("#ffffff"), 2.2))
+            x, y, w, h = box.x(), box.y(), box.width(), box.height()
+            painter.drawLine(int(x + w * 0.22), int(y + h * 0.52), int(x + w * 0.42), int(y + h * 0.72))
+            painter.drawLine(int(x + w * 0.42), int(y + h * 0.72), int(x + w * 0.78), int(y + h * 0.28))
+
+        thumb = QRect(rect.left() + 36, rect.top() + 10, 40 if compact else 112, 36 if compact else 76)
         image_path = index.data(ROLE_IMAGE)
         pixmap = None if low_data or compact else _load_thumb(image_path)
         if pixmap is not None:
@@ -156,17 +168,6 @@ class ArticleCardDelegate(QStyledItemDelegate):
         painter.setFont(hint_font)
         painter.setPen(accent)
         painter.drawText(hint_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, "›")
-        if selected:
-            chip = QRect(rect.right() - 46, rect.bottom() - 26, 36, 18)
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(accent)
-            painter.drawRoundedRect(chip, 9, 9)
-            painter.setPen(QColor("#ffffff"))
-            mark_font = QFont(option.font)
-            mark_font.setPointSize(max(1, 8))
-            mark_font.setBold(True)
-            painter.setFont(mark_font)
-            painter.drawText(chip, Qt.AlignmentFlag.AlignCenter, "✓")
         if bool(index.data(ROLE_SAVED)):
             painter.setPen(QColor("#e3b341"))
             painter.drawText(QRect(rect.right() - 48, rect.top() + 22, 42, 20), Qt.AlignmentFlag.AlignRight, "★")
@@ -177,6 +178,11 @@ class ArticleCardDelegate(QStyledItemDelegate):
             painter.drawEllipse(rect.right() - 18, rect.top() + 12, 8, 8)
 
         painter.restore()
+
+
+def _checkbox_rect(card: QRect, compact: bool) -> QRect:
+    size = 16 if compact else 18
+    return QRect(card.left() + 10, card.center().y() - size // 2, size, size)
 
 
 def _round_rect(rect: QRect, radius: int) -> QPainterPath:
@@ -258,11 +264,15 @@ class ArticleList(QFrame):
         self.economy_btn = QPushButton()
         self.module_btn = QPushButton()
         self.module_btn.setObjectName("ghostButton")
+        self.select_all_btn = QPushButton()
+        self.select_all_btn.setObjectName("ghostButton")
+        self.select_none_btn = QPushButton()
+        self.select_none_btn.setObjectName("ghostButton")
         self.selected_btn = QPushButton()
         self.selected_btn.setObjectName("ghostButton")
         self.list_widget = QListWidget()
         self.list_widget.setObjectName("articleFeed")
-        self.list_widget.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.list_widget.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         self.list_widget.setUniformItemSizes(True)
         self.list_widget.setSpacing(2)
         self.list_widget.setMouseTracking(True)
@@ -270,6 +280,7 @@ class ArticleList(QFrame):
         self.list_widget.setCursor(Qt.CursorShape.PointingHandCursor)
         self.list_widget.viewport().setCursor(Qt.CursorShape.PointingHandCursor)
         self.list_widget.viewport().installEventFilter(self)
+        self.list_widget.installEventFilter(self)
         self.list_widget.setProperty("ynPressedRow", -1)
         self.empty_label = QLabel()
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -293,6 +304,8 @@ class ArticleList(QFrame):
             self.custom_to,
             self.folder_combo,
             self.economy_btn,
+            self.select_all_btn,
+            self.select_none_btn,
             self.selected_btn,
         ):
             actions.addWidget(widget)
@@ -312,6 +325,8 @@ class ArticleList(QFrame):
         self.list_widget.currentItemChanged.connect(self._on_select)
         self.economy_btn.clicked.connect(lambda: self.economy_briefing_requested.emit(self.hours()))
         self.selected_btn.clicked.connect(self._emit_selected)
+        self.select_all_btn.clicked.connect(self.select_all_visible)
+        self.select_none_btn.clicked.connect(self.clear_picks)
         self.hours_combo.currentIndexChanged.connect(self._on_hours_changed)
         self.custom_from.dateChanged.connect(self.hours_changed.emit)
         self.custom_to.dateChanged.connect(self.hours_changed.emit)
@@ -326,15 +341,39 @@ class ArticleList(QFrame):
         if watched is self.list_widget.viewport():
             kind = event.type()
             if kind == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
-                item = self.list_widget.itemAt(event.position().toPoint())
+                pos = event.position().toPoint()
+                item = self.list_widget.itemAt(pos)
                 row = self.list_widget.row(item) if item is not None else -1
+                if item is not None and self._hit_checkbox(item, pos):
+                    self._toggle_pick(item)
+                    return True
                 self.list_widget.setProperty("ynPressedRow", row)
                 self.list_widget.viewport().update()
             elif kind in {QEvent.Type.MouseButtonRelease, QEvent.Type.Leave}:
                 if int(self.list_widget.property("ynPressedRow") or -1) != -1:
                     self.list_widget.setProperty("ynPressedRow", -1)
                     self.list_widget.viewport().update()
+        if watched is self.list_widget and event.type() == QEvent.Type.KeyPress:
+            if event.key() in {Qt.Key.Key_Space, Qt.Key.Key_Insert}:
+                item = self.list_widget.currentItem()
+                if item is not None:
+                    self._toggle_pick(item)
+                    return True
+            if event.key() == Qt.Key.Key_A and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                self.select_all_visible()
+                return True
         return super().eventFilter(watched, event)
+
+    def _hit_checkbox(self, item: QListWidgetItem, pos) -> bool:
+        vis = self.list_widget.visualItemRect(item)
+        card = vis.adjusted(4, 3, -4, -3)
+        compact = bool(item.data(ROLE_COMPACT))
+        return _checkbox_rect(card, compact).contains(pos)
+
+    def _toggle_pick(self, item: QListWidgetItem) -> None:
+        item.setData(ROLE_PICKED, not bool(item.data(ROLE_PICKED)))
+        self.list_widget.viewport().update()
+        self._refresh_pick_label()
 
     def date_sort(self) -> str:
         return normalize_article_date_sort(self.sort_combo.currentData())
@@ -431,15 +470,49 @@ class ArticleList(QFrame):
 
     def selected_ids(self) -> list[int]:
         ids: list[int] = []
-        for item in self.list_widget.selectedItems():
+        for row in range(self.list_widget.count()):
+            item = self.list_widget.item(row)
+            if item is None or not item.data(ROLE_PICKED):
+                continue
             value = item.data(ROLE_ID)
             if value is not None:
                 ids.append(int(value))
         return ids
 
+    def select_all_visible(self) -> None:
+        for row in range(self.list_widget.count()):
+            item = self.list_widget.item(row)
+            if item is not None:
+                item.setData(ROLE_PICKED, True)
+        self.list_widget.viewport().update()
+        self._refresh_pick_label()
+
+    def clear_picks(self) -> None:
+        for row in range(self.list_widget.count()):
+            item = self.list_widget.item(row)
+            if item is not None:
+                item.setData(ROLE_PICKED, False)
+        self.list_widget.viewport().update()
+        self._refresh_pick_label()
+
+    def _refresh_pick_label(self) -> None:
+        count = len(self.selected_ids())
+        if count:
+            self.selected_btn.setText(
+                self._i18n.t("ai.brief_selected_count").replace("{count}", str(count))
+            )
+        else:
+            self.selected_btn.setText(self._i18n.t("ai.brief_selected"))
+        has_rows = self.list_widget.count() > 0
+        self.select_all_btn.setEnabled(has_rows)
+        self.select_none_btn.setEnabled(count > 0)
+        self.selected_btn.setEnabled(count > 0)
+
     def set_busy(self, busy: bool) -> None:
         self.economy_btn.setEnabled(not busy)
-        self.selected_btn.setEnabled(not busy)
+        self.select_all_btn.setEnabled(not busy and self.list_widget.count() > 0)
+        self.select_none_btn.setEnabled(not busy and bool(self.selected_ids()))
+        self.selected_btn.setEnabled(not busy and bool(self.selected_ids()))
         self.hours_combo.setEnabled(not busy)
         if busy:
             self.economy_btn.setText(self._i18n.t("ai.summarizing"))
@@ -497,7 +570,9 @@ class ArticleList(QFrame):
             .replace("{hours}", str(hours))
             .replace("{module}", heading)
         )
-        self.selected_btn.setText(self._i18n.t("ai.brief_selected"))
+        self.select_all_btn.setText(self._i18n.t("app.select_all"))
+        self.select_none_btn.setText(self._i18n.t("app.select_none"))
+        self._refresh_pick_label()
         self.module_btn.setVisible(False)
         self.hours_combo.setToolTip(self._i18n.t("ai.hours_hint"))
 
@@ -537,6 +612,7 @@ class ArticleList(QFrame):
         current_id = None
         if self.list_widget.currentItem():
             current_id = self.list_widget.currentItem().data(ROLE_ID)
+        picked = set(self.selected_ids())
         self.list_widget.blockSignals(True)
         self.list_widget.setUpdatesEnabled(False)
         self.list_widget.clear()
@@ -553,6 +629,7 @@ class ArticleList(QFrame):
             item = QListWidgetItem()
             item.setSizeHint(QSize(0, 56 if self._compact else 96))
             _bind_article_item(item, article, self._i18n, compact=self._compact, low_data=self._low_data, relative=self._relative)
+            item.setData(ROLE_PICKED, article.id in picked)
             self.list_widget.addItem(item)
             if article.id == current_id:
                 restore_row = index
@@ -560,6 +637,7 @@ class ArticleList(QFrame):
             self.list_widget.setCurrentRow(restore_row)
         self.list_widget.blockSignals(False)
         self.list_widget.setUpdatesEnabled(True)
+        self._refresh_pick_label()
         if articles:
             self._on_select()
 
@@ -616,4 +694,5 @@ def _bind_article_item(
     item.setData(ROLE_SAVED, bool(article.is_saved))
     item.setData(ROLE_COMPACT, compact)
     item.setData(ROLE_LOW_DATA, low_data)
+    item.setData(ROLE_PICKED, False)
     item.setToolTip(article.title)
