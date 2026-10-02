@@ -50,6 +50,12 @@ from ui.components.tutorial_panel import TutorialDialog
 from ui.theme import apply_app_theme
 
 
+def _format_print_date(value) -> str:
+    if isinstance(value, datetime):
+        return value.strftime("%d.%m.%Y %H:%M")
+    return str(value or "")
+
+
 class MainWindow(QMainWindow):
     def __init__(self, db: Database, i18n: I18nManager) -> None:
         super().__init__()
@@ -1174,20 +1180,97 @@ class MainWindow(QMainWindow):
         dialog = ShareDialog(article, self.i18n, self)
         dialog.exec()
 
+    def _article_document(self, article) -> QTextDocument:
+        import html
+
+        from PySide6.QtGui import QImage
+
+        doc = QTextDocument()
+        doc.setDefaultStyleSheet(
+            "body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11pt; color: #111; }"
+            "h1 { font-size: 20pt; margin: 0 0 6px 0; }"
+            ".meta { color: #555; font-size: 9.5pt; margin-bottom: 12px; }"
+            ".box { background: #f2f5f9; border-left: 3px solid #0969da; padding: 8px; margin: 10px 0; }"
+            ".label { font-weight: bold; color: #0969da; }"
+            "p { margin: 0 0 9px 0; line-height: 140%; }"
+            ".link { color: #0969da; font-size: 9pt; }"
+            ".foot { color: #888; font-size: 8pt; margin-top: 18px; }"
+        )
+
+        def to_text(value: str) -> str:
+            text = value or ""
+            if "<" in text and ">" in text:
+                markup = QTextDocument()
+                markup.setHtml(text)
+                text = markup.toPlainText()
+            return html.unescape(text).replace("\u2028", "\n").replace("\r", "")
+
+        def paragraphs(text: str) -> str:
+            blocks = [line.strip() for line in to_text(text).split("\n")]
+            return "".join(f"<p>{html.escape(block)}</p>" for block in blocks if block)
+
+        source = html.unescape(article.source_name or "")
+        meta = [part for part in (source, _format_print_date(article.pub_date)) if part]
+        parts = [f"<h1>{html.escape(html.unescape(article.title or ''))}</h1>"]
+        if meta:
+            parts.append(f"<div class='meta'>{html.escape('  ·  '.join(meta))}</div>")
+        image_path = article.image_path or ""
+        if image_path and Path(image_path).is_file():
+            image = QImage(image_path)
+            if not image.isNull():
+                if image.width() > 640:
+                    image = image.scaledToWidth(640, Qt.TransformationMode.SmoothTransformation)
+                image.setDevicePixelRatio(1.0)
+                doc.addResource(QTextDocument.ResourceType.ImageResource, QUrl("younews://image"), image)
+                parts.append(
+                    f"<div style='margin-bottom: 12px;'><img src='younews://image' "
+                    f"width='{image.width()}' height='{image.height()}'></div>"
+                )
+        if article.ai_summary:
+            parts.append(
+                f"<div class='box'><span class='label'>{html.escape(self.i18n.t('app.print_summary'))}</span>"
+                f"{paragraphs(article.ai_summary)}</div>"
+            )
+        if article.note:
+            parts.append(
+                f"<div class='box'><span class='label'>{html.escape(self.i18n.t('app.print_note'))}</span>"
+                f"{paragraphs(article.note)}</div>"
+            )
+        parts.append(paragraphs(article.content or ""))
+        if article.link:
+            parts.append(f"<p class='link'>{html.escape(article.link)}</p>")
+        parts.append("<p class='foot'>You News · younews.media</p>")
+        doc.setHtml("<body>" + "".join(parts) + "</body>")
+        return doc
+
     def _print_article(self, article_id: int) -> None:
         article = self.db.get_article(article_id)
         if article is None:
             return
         try:
-            from PySide6.QtPrintSupport import QPrintDialog, QPrinter
+            from PySide6.QtGui import QPageLayout, QPageSize
+            from PySide6.QtCore import QMarginsF
+            from PySide6.QtPrintSupport import QPrinter, QPrintPreviewDialog
         except ImportError:
             return
-        printer = QPrinter()
-        dialog = QPrintDialog(printer, self)
-        if dialog.exec():
-            doc = QTextDocument()
-            doc.setPlainText(f"{article.title}\n\n{article.content or ''}")
-            doc.print_(printer)
+        doc = self._article_document(article)
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        printer.setPageLayout(
+            QPageLayout(
+                QPageSize(QPageSize.PageSizeId.A4),
+                QPageLayout.Orientation.Portrait,
+                QMarginsF(16, 16, 16, 16),
+                QPageLayout.Unit.Millimeter,
+            )
+        )
+        printer.setDocName(article.title or "You News")
+        preview = QPrintPreviewDialog(printer, self)
+        preview.setWindowTitle(f"{self.i18n.t('app.print_preview')} — {article.title or ''}")
+        preview.paintRequested.connect(doc.print_)
+        screen = self.screen().availableGeometry() if self.screen() else None
+        if screen is not None:
+            preview.resize(min(980, screen.width() - 80), min(1000, screen.height() - 80))
+        preview.exec()
 
     def _pdf_article(self, article_id: int) -> None:
         article = self.db.get_article(article_id)
@@ -1204,9 +1287,7 @@ class MainWindow(QMainWindow):
         printer = QPrinter(QPrinter.PrinterMode.HighResolution)
         printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
         printer.setOutputFileName(path)
-        doc = QTextDocument()
-        doc.setPlainText(f"{article.title}\n\n{article.content or ''}")
-        doc.print_(printer)
+        self._article_document(article).print_(printer)
 
     def _open_in_app(self, article_id: int) -> None:
         article = self.db.get_article(article_id)

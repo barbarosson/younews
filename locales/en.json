@@ -538,5 +538,8 @@
   "license.store_hint": "Purchases and trials are handled by the Microsoft Store. Deactivate is not used for Store licenses.",
   "tickers.no_results": "No match. Try another word or type a Yahoo symbol below.",
   "tickers.results_count": "{count} results",
-  "tickers.added": "Added {name} to the tape."
+  "tickers.added": "Added {name} to the tape.",
+  "app.print_preview": "Print preview",
+  "app.print_summary": "AI summary",
+  "app.print_note": "Your note"
 }

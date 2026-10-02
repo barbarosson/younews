@@ -538,5 +538,8 @@
   "license.store_hint": "Satın alma ve deneme Microsoft Store üzerinden yürür. Store lisansında Bu PC’de kapat kullanılmaz.",
   "tickers.no_results": "Eşleşme yok. Başka bir kelime deneyin veya aşağıya Yahoo sembolü yazın.",
   "tickers.results_count": "{count} sonuç",
-  "tickers.added": "{name} şeride eklendi."
+  "tickers.added": "{name} şeride eklendi.",
+  "app.print_preview": "Baskı önizleme",
+  "app.print_summary": "Yapay zekâ özeti",
+  "app.print_note": "Notunuz"
 }
