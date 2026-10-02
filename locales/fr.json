@@ -560,5 +560,9 @@
   "topics.sports.basketball.fiba": "FIBA / international",
   "topics.sports.other": "Autres sports",
   "topics.politics.world": "Monde",
-  "topics.politics.us": "Politique US"
+  "topics.politics.us": "Politique US",
+  "app.quiet_start": "Quiet hours start",
+  "app.quiet_end": "Quiet hours end",
+  "app.tape_speed": "Ticker tape speed",
+  "app.sync_folder_label": "Backup folder"
 }

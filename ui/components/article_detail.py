@@ -22,6 +22,7 @@ from core.i18n_manager import I18nManager
 from core.speech_engine import SpeechEngine, plain_text
 from database.models import Article
 from ui.components.news_avatar import NewsAvatar
+from ui.flow_layout import FlowLayout
 
 SENTIMENT_OBJECTS = {
     "bullish/positive": "sentimentBullish",
@@ -188,19 +189,22 @@ class ArticleDetail(QFrame):
         header.setSpacing(6)
         header.addWidget(self.sentiment_badge)
         header.addStretch(1)
-        header.addWidget(self.translate_btn)
-        header.addWidget(self.fulltext_btn)
-        header.addWidget(self.summarize_btn)
-        tools = QHBoxLayout()
-        tools.setSpacing(6)
-        tools.addWidget(self.export_btn)
-        tools.addWidget(self.copy_btn)
-        tools.addWidget(self.share_btn)
-        tools.addWidget(self.print_btn)
-        tools.addWidget(self.pdf_btn)
-        tools.addWidget(self.browser_btn)
-        tools.addWidget(self.photo_btn)
-        tools.addStretch(1)
+        self.tools_bar = QWidget()
+        tools = FlowLayout(self.tools_bar, spacing=6)
+        tools.setContentsMargins(0, 0, 0, 0)
+        for button in (
+            self.summarize_btn,
+            self.translate_btn,
+            self.fulltext_btn,
+            self.export_btn,
+            self.copy_btn,
+            self.share_btn,
+            self.print_btn,
+            self.pdf_btn,
+            self.browser_btn,
+            self.photo_btn,
+        ):
+            tools.addWidget(button)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
@@ -208,7 +212,7 @@ class ArticleDetail(QFrame):
         layout.addWidget(self.title_label)
         layout.addWidget(self.meta_label)
         layout.addLayout(header)
-        layout.addLayout(tools)
+        layout.addWidget(self.tools_bar)
         layout.addWidget(self.narrator_bar)
         layout.addWidget(self.save_panel)
         layout.addWidget(self.meta_fields)

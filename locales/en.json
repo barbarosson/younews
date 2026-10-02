@@ -38,7 +38,7 @@
   "app.sort_oldest": "Oldest first",
   "app.filter_source": "Source",
   "app.filter_source_all": "All sources",
-  "app.summarize": "Summarize & Analyze with AI",
+  "app.summarize": "Summarize and analyze with AI",
   "app.refresh": "Refresh feeds",
   "app.refresh_interval": "News refresh interval",
   "app.refresh_interval_off": "Manual only",
@@ -121,7 +121,7 @@
   "app.wizard_body": "Choose your language and a starter news pack. You can change sources anytime in Settings. Your data stays on this PC. AI needs your own API key or Ollama — not included in the license.",
   "app.wizard_language": "Language",
   "app.wizard_pack": "Starter sources",
-  "app.wizard_pack_none": "Skip — I’ll add feeds myself",
+  "app.wizard_pack_none": "Just the 10 global sources (BBC, NYT, Al Jazeera…)",
   "app.wizard_pack_tr": "Türkiye headlines",
   "app.wizard_pack_us": "US headlines",
   "app.wizard_continue": "Continue",
@@ -541,5 +541,9 @@
   "tickers.added": "Added {name} to the tape.",
   "app.print_preview": "Print preview",
   "app.print_summary": "AI summary",
-  "app.print_note": "Your note"
+  "app.print_note": "Your note",
+  "app.quiet_start": "Quiet hours start",
+  "app.quiet_end": "Quiet hours end",
+  "app.tape_speed": "Ticker tape speed",
+  "app.sync_folder_label": "Backup folder"
 }

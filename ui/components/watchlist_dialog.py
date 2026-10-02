@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -18,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from core.i18n_manager import I18nManager
 from core.ticker_catalog import QUICK_FILTERS, CatalogTicker, _fold, country_i18n_key, search_catalog
-from core.yahoo_lookup import YahooLookupWorker, merge_ticker_search
+from core.yahoo_lookup import YahooLookupWorker, merge_ticker_search, start_lookup
 from database.db import Database
 
 ROLE_PAIR = Qt.ItemDataRole.UserRole
@@ -35,7 +36,12 @@ class WatchlistDialog(QDialog):
         self._yahoo_query = ""
         self._yahoo_thread: YahooLookupWorker | None = None
         self.setModal(True)
-        self.resize(560, 640)
+        screen = (parent.screen() if parent is not None else None) or QGuiApplication.primaryScreen()
+        avail = screen.availableGeometry() if screen is not None else None
+        width, height = 640, 860
+        if avail is not None:
+            width, height = min(width, avail.width() - 40), min(height, avail.height() - 60)
+        self.resize(width, height)
 
         self.hint = QLabel()
         self.hint.setWordWrap(True)
@@ -236,11 +242,7 @@ class WatchlistDialog(QDialog):
         if len(_fold(query)) < 2:
             self._set_results_caption(searching=False)
             return
-        worker = YahooLookupWorker(query, self)
-        worker.finished_ok.connect(self._on_yahoo)
-        worker.finished.connect(worker.deleteLater)
-        worker.start()
-        self._yahoo_thread = worker
+        self._yahoo_thread = start_lookup(query, self._on_yahoo)
 
     def _on_yahoo(self, query: str, items: list) -> None:
         if _fold(query) != _fold(self.search.text()):

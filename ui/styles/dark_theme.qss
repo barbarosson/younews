@@ -384,3 +384,17 @@ QListWidget#articleFeed::item:hover {
     font-weight: 700;
     color: #f0f6fc;
 }
+
+QRadioButton::indicator {
+    width: 14px;
+    height: 14px;
+    border-radius: 8px;
+    border: 1px solid #6e7681;
+    background: #0d1117;
+}
+
+QRadioButton::indicator:checked {
+    border: 5px solid #2f81f7;
+    width: 6px;
+    height: 6px;
+}

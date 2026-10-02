@@ -29,6 +29,19 @@ from ui.branding import apply_mascot
 from ui.components.ticker_bar import TickerBar
 
 
+def disclaimer_html(i18n: I18nManager) -> str:
+    text = i18n.t("app.disclaimer")
+    try:
+        from core.store_license import uses_store_licensing
+
+        store = uses_store_licensing()
+    except Exception:
+        store = False
+    if store:
+        text = "</p>".join(part for part in text.split("</p>") if "Paddle" not in part)
+    return text
+
+
 class AboutDialog(QDialog):
     def __init__(self, i18n: I18nManager, parent=None) -> None:
         super().__init__(parent)
@@ -44,8 +57,8 @@ class AboutDialog(QDialog):
             f"<h2>{APP_NAME} {APP_VERSION}</h2>"
             f"<p>{i18n.t('app.about_license')}</p>"
             f"{i18n.t('app.about_links')}"
-            f"{i18n.t('app.disclaimer')}"
-            f"<pre>{APP_CHANGELOG}</pre>"
+            f"{disclaimer_html(i18n)}"
+            f"<pre style='white-space: pre-wrap;'>{APP_CHANGELOG}</pre>"
         )
         close = QPushButton(i18n.t("app.close"))
         close.clicked.connect(self.accept)
@@ -88,10 +101,7 @@ class FirstRunWizard(QDialog):
         self.pack_none = QRadioButton(i18n.t("app.wizard_pack_none"))
         self.pack_tr = QRadioButton(i18n.t("app.wizard_pack_tr"))
         self.pack_us = QRadioButton(i18n.t("app.wizard_pack_us"))
-        if i18n.language == "tr":
-            self.pack_tr.setChecked(True)
-        else:
-            self.pack_us.setChecked(True)
+        self.pack_none.setChecked(True)
         pack_layout.addWidget(self.pack_tr)
         pack_layout.addWidget(self.pack_us)
         pack_layout.addWidget(self.pack_none)
@@ -99,7 +109,7 @@ class FirstRunWizard(QDialog):
         notice = QLabel()
         notice.setWordWrap(True)
         notice.setTextFormat(Qt.TextFormat.RichText)
-        notice.setText(i18n.t("app.disclaimer"))
+        notice.setText(disclaimer_html(i18n))
         ok = QPushButton(i18n.t("app.wizard_continue"))
         ok.clicked.connect(self._finish)
         layout = QVBoxLayout(self)

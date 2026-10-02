@@ -114,7 +114,7 @@
   "app.wizard_body": "Dilinizi ve başlangıç haber paketini seçin. Kaynakları sonra Ayarlar’dan değiştirebilirsiniz. Verileriniz bu PC’de kalır. Yapay zekâ için kendi API anahtarınız veya Ollama gerekir — lisansın içinde değil.",
   "app.wizard_language": "Dil",
   "app.wizard_pack": "Başlangıç kaynakları",
-  "app.wizard_pack_none": "Atla — kaynakları kendim eklerim",
+  "app.wizard_pack_none": "Yalnızca 10 küresel kaynak (BBC, NYT, Al Jazeera…)",
   "app.wizard_pack_tr": "Türkiye manşetleri",
   "app.wizard_pack_us": "ABD manşetleri",
   "app.wizard_continue": "Devam",
@@ -541,5 +541,9 @@
   "tickers.added": "{name} şeride eklendi.",
   "app.print_preview": "Baskı önizleme",
   "app.print_summary": "Yapay zekâ özeti",
-  "app.print_note": "Notunuz"
+  "app.print_note": "Notunuz",
+  "app.quiet_start": "Sessiz saat başlangıcı",
+  "app.quiet_end": "Sessiz saat bitişi",
+  "app.tape_speed": "Şerit hızı",
+  "app.sync_folder_label": "Yedek klasörü"
 }

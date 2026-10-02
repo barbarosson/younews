@@ -150,10 +150,11 @@ class Sidebar(QFrame):
         self._refresh_logo()
 
     def _refresh_logo(self) -> None:
-        shown = apply_wordmark(self.logo, self.width() - 24)
+        roomy = self.height() >= 840
+        shown = self.height() >= 600 and apply_wordmark(self.logo, self.width() - 24)
         self.logo.setVisible(shown)
         self.brand.setVisible(not shown)
-        mascot_ok = apply_mascot(self.mascot, min(120, max(88, self.width() - 48)))
+        mascot_ok = roomy and apply_mascot(self.mascot, min(120, max(88, self.width() - 48)))
         self.mascot.setVisible(mascot_ok)
 
     def reload_modules(self) -> None:
@@ -314,6 +315,14 @@ class Sidebar(QFrame):
         self._paint_counts()
 
     def _paint_counts(self) -> None:
+        current = self.module_tree.currentItem()
+        selected_path: set[int] = set()
+        node = current
+        while node is not None:
+            selected_path.add(id(node))
+            node = node.parent()
+        hide_empty = bool(self._counts)
+
         def walk(item: QTreeWidgetItem) -> None:
             label = item.data(0, ROLE_LABEL) or item.text(0)
             kind = item.data(0, ROLE_KIND)
@@ -330,6 +339,8 @@ class Sidebar(QFrame):
                     key = f"archive:{key}"
             count = self._counts.get(key, 0) if key else 0
             item.setText(0, f"{label} ({count})")
+            pinned = kind == "all" or (kind == "archive" and not module_id) or id(item) in selected_path
+            item.setHidden(hide_empty and count == 0 and not pinned)
             for index in range(item.childCount()):
                 child = item.child(index)
                 if child is not None:

@@ -87,7 +87,6 @@ class MainWindow(QMainWindow):
         self.article_detail = ArticleDetail(i18n)
         self.chat_panel = ChatPanel(i18n, db=db)
         self.chat_panel.hide()
-        self.sidebar.setMinimumWidth(200)
         self.sidebar.setMaximumWidth(280)
         self.article_list.setMinimumWidth(340)
         self.article_list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -110,7 +109,7 @@ class MainWindow(QMainWindow):
         self.splitter.setStretchFactor(2, 1)
         self.splitter.setStretchFactor(3, 0)
         self.splitter.setChildrenCollapsible(False)
-        self.splitter.setCollapsible(0, True)
+        self.splitter.setCollapsible(0, False)
         self.splitter.setCollapsible(3, True)
         self.splitter.setSizes(self._balanced_sizes(1280))
 
@@ -244,7 +243,7 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
         self._place_busy_overlay()
-        self._balance_panes()
+        QTimer.singleShot(0, self._balance_panes)
 
     def _place_busy_overlay(self) -> None:
         overlay = getattr(self, "_busy_overlay", None)
@@ -410,6 +409,7 @@ class MainWindow(QMainWindow):
         if persist:
             self.db.set_setting("theme", resolved)
         self.ticker.set_theme(resolved)
+        self.chat_panel.set_theme(resolved)
         sync = getattr(self.sidebar, "sync_theme", None)
         if callable(sync):
             sync(resolved)
@@ -1041,7 +1041,7 @@ class MainWindow(QMainWindow):
         width = int(total or self.splitter.width() or self.width() or 1280)
         side_on = self.sidebar.isVisible()
         chat_on = self.chat_panel.isVisible()
-        side = 240 if side_on else 0
+        side = min(280, max(240, self.sidebar.minimumSizeHint().width())) if side_on else 0
         chat = 300 if chat_on else 0
         rest = max(340 + 400, width - side - chat)
         detail = min(680, max(420, int(rest * 0.38)))

@@ -19,12 +19,14 @@ from PySide6.QtWidgets import (
     QStyle,
     QStyleOptionViewItem,
     QVBoxLayout,
+    QWidget,
 )
 
 from config import BRIEFING_HOURS_DEFAULT, BRIEFING_HOURS_OPTIONS, normalize_article_date_sort
 from core.app_extras import relative_time, source_domain
 from core.i18n_manager import I18nManager
 from database.models import Article
+from ui.flow_layout import FlowLayout
 
 ROLE_ID = Qt.ItemDataRole.UserRole
 ROLE_TITLE = Qt.ItemDataRole.UserRole + 1
@@ -276,30 +278,35 @@ class ArticleList(QFrame):
         self.follows_btn.hide()
         self.follows_btn.clicked.connect(self.follows_requested.emit)
 
-        actions = QHBoxLayout()
-        actions.addWidget(self.hours_combo)
-        actions.addWidget(self.custom_from)
-        actions.addWidget(self.custom_to)
-        actions.addWidget(self.folder_combo)
-        actions.addWidget(self.economy_btn, 1)
-        actions.addWidget(self.selected_btn, 1)
-
-        search_row = QHBoxLayout()
-        search_row.addWidget(self.search, 1)
-        search_row.addWidget(self.source_combo)
-        search_row.addWidget(self.read_combo)
-        search_row.addWidget(self.mark_read_btn)
-        search_row.addWidget(self.sort_combo)
+        self.source_combo.setMaximumWidth(220)
+        self.filters_bar = QWidget()
+        filters = FlowLayout(self.filters_bar, spacing=6)
+        filters.setContentsMargins(0, 0, 0, 0)
+        for widget in (self.source_combo, self.read_combo, self.sort_combo, self.mark_read_btn):
+            filters.addWidget(widget)
+        self.actions_bar = QWidget()
+        actions = FlowLayout(self.actions_bar, spacing=6)
+        actions.setContentsMargins(0, 0, 0, 0)
+        for widget in (
+            self.hours_combo,
+            self.custom_from,
+            self.custom_to,
+            self.folder_combo,
+            self.economy_btn,
+            self.selected_btn,
+        ):
+            actions.addWidget(widget)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.addWidget(self.breaking)
-        layout.addLayout(search_row)
+        layout.addWidget(self.search)
+        layout.addWidget(self.filters_bar)
         layout.addWidget(self.last_update_label)
         layout.addWidget(self.context_label)
-        layout.addLayout(actions)
+        layout.addWidget(self.actions_bar)
         layout.addWidget(self.list_widget, 1)
-        layout.addWidget(self.empty_label)
+        layout.addWidget(self.empty_label, 1)
         layout.addWidget(self.follows_btn, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self.list_widget.currentItemChanged.connect(self._on_select)

@@ -52,14 +52,12 @@ from config import (
 )
 from core.i18n_manager import I18nManager
 from core.ticker_catalog import CatalogTicker, _fold, search_catalog
-from core.yahoo_lookup import YahooLookupWorker, merge_ticker_search
+from core.yahoo_lookup import YahooLookupWorker, merge_ticker_search, start_lookup
 from database.db import Database
 from ui.components.social_tab import SocialFollowsTab
 from ui.components.sources_tab import SourcesTab
 from ui.components.tutorial_panel import TutorialPanel
 from ui.theme import apply_app_theme
-
-_LIVE_LOOKUPS: set[YahooLookupWorker] = set()
 
 PROVIDER_LABEL_KEYS: tuple[tuple[str, str], ...] = (
     ("openai", "app.openai"),
@@ -152,6 +150,11 @@ class SettingsDialog(QDialog):
         self.auto_update = QCheckBox()
         self.github_repo = QLineEdit()
         self.sync_folder = QLineEdit()
+        self.proxy_label = QLabel()
+        self.quiet_start_label = QLabel()
+        self.quiet_end_label = QLabel()
+        self.tape_speed_label = QLabel()
+        self.sync_folder_label = QLabel()
         self.vacuum_btn = QPushButton()
         self.cache_btn = QPushButton()
         self.about_btn = QPushButton()
@@ -246,10 +249,10 @@ class SettingsDialog(QDialog):
         form.addRow(self.minimize_tray)
         form.addRow(self.start_windows)
         form.addRow(self.notify_alerts)
-        form.addRow(self.proxy_edit)
-        form.addRow(self.quiet_start)
-        form.addRow(self.quiet_end)
-        form.addRow(self.tape_speed)
+        form.addRow(self.proxy_label, self.proxy_edit)
+        form.addRow(self.quiet_start_label, self.quiet_start)
+        form.addRow(self.quiet_end_label, self.quiet_end)
+        form.addRow(self.tape_speed_label, self.tape_speed)
         form.addRow(self.hide_tape)
         form.addRow(self.compact_tape)
         form.addRow(self.compact_list)
@@ -260,7 +263,7 @@ class SettingsDialog(QDialog):
         form.addRow(self.intraday)
         form.addRow(self.auto_update)
         form.addRow(self.github_repo)
-        form.addRow(self.sync_folder)
+        form.addRow(self.sync_folder_label, self.sync_folder)
         help_row = FlowLayout()
         help_row.addWidget(self.help_site_btn)
         help_row.addWidget(self.help_privacy_btn)
@@ -483,7 +486,12 @@ class SettingsDialog(QDialog):
         self.minimize_tray.setText(self._i18n.t("app.minimize_tray"))
         self.start_windows.setText(self._i18n.t("app.start_windows"))
         self.notify_alerts.setText(self._i18n.t("app.notify_alerts"))
-        self.proxy_edit.setPlaceholderText(self._i18n.t("app.proxy"))
+        self.proxy_edit.setPlaceholderText("http://host:port")
+        self.proxy_label.setText(self._i18n.t("app.proxy"))
+        self.quiet_start_label.setText(self._i18n.t("app.quiet_start"))
+        self.quiet_end_label.setText(self._i18n.t("app.quiet_end"))
+        self.tape_speed_label.setText(self._i18n.t("app.tape_speed"))
+        self.sync_folder_label.setText(self._i18n.t("app.sync_folder_label"))
         self.hide_tape.setText(self._i18n.t("app.hide_tape"))
         self.compact_tape.setText(self._i18n.t("app.compact_tape"))
         self.compact_list.setText(self._i18n.t("app.compact_list"))
@@ -887,13 +895,7 @@ class SettingsDialog(QDialog):
         query = self.ticker_search.text().strip()
         if len(_fold(query)) < 2:
             return
-        worker = YahooLookupWorker(query)
-        _LIVE_LOOKUPS.add(worker)
-        worker.finished_ok.connect(self._on_yahoo_tickers)
-        worker.finished.connect(lambda w=worker: _LIVE_LOOKUPS.discard(w))
-        worker.finished.connect(worker.deleteLater)
-        worker.start()
-        self._yahoo_thread = worker
+        self._yahoo_thread = start_lookup(query, self._on_yahoo_tickers)
         self._update_results_status(searching=True)
 
     def _on_yahoo_tickers(self, query: str, items: list) -> None:

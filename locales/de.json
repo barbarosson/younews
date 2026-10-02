@@ -38,7 +38,7 @@
   "app.sort_oldest": "Älteste zuerst",
   "app.filter_source": "Quelle",
   "app.filter_source_all": "Alle Quellen",
-  "app.summarize": "Mit KI zusammenfassen & analysieren",
+  "app.summarize": "Mit KI zusammenfassen und analysieren",
   "app.refresh": "Feeds aktualisieren",
   "app.refresh_interval": "Nachrichten-Aktualisierungsintervall",
   "app.refresh_interval_off": "Nur manuell",
@@ -560,5 +560,9 @@
   "topics.sports.basketball.fiba": "FIBA / international",
   "topics.sports.other": "Andere Sportarten",
   "topics.politics.world": "Welt",
-  "topics.politics.us": "US-Politik"
+  "topics.politics.us": "US-Politik",
+  "app.quiet_start": "Quiet hours start",
+  "app.quiet_end": "Quiet hours end",
+  "app.tape_speed": "Ticker tape speed",
+  "app.sync_folder_label": "Backup folder"
 }

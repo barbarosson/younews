@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import os
 import sys
 from pathlib import Path
 
@@ -50,7 +52,28 @@ def main() -> int:
     window.show()
     code = app.exec()
     lock.unlock()
+    if not _drain_threads(window):
+        logging.getLogger(__name__).warning("Background work still running at exit; skipping teardown")
+        logging.shutdown()
+        os._exit(code)
     return code
+
+
+def _drain_threads(window, timeout_ms: int = 3000) -> bool:
+    """Qt aborts the process if a QThread object is destroyed while still running."""
+    from PySide6.QtCore import QDeadlineTimer, QThread
+
+    from core.yahoo_lookup import LIVE_LOOKUPS
+
+    threads = [*window.findChildren(QThread), *LIVE_LOOKUPS]
+    for thread in threads:
+        if thread.isRunning():
+            thread.requestInterruption()
+            thread.quit()
+    deadline = QDeadlineTimer(timeout_ms)
+    for thread in threads:
+        thread.wait(deadline)
+    return not any(thread.isRunning() for thread in threads)
 
 
 if __name__ == "__main__":

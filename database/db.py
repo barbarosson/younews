@@ -194,6 +194,7 @@ class Database:
         self.path = path
         self._lock = threading.RLock()
         self._conn: _SharedConnection | None = None
+        self._leaf_cache: dict[tuple, str | None] = {}
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self._init_schema()
         hours = parse_retention_hours(self.get_setting("article_retention_hours"))
@@ -932,63 +933,57 @@ class Database:
         cutoff = None
         if max_age_hours:
             cutoff = datetime.now(timezone.utc) - timedelta(hours=max(1, max_age_hours))
-            cutoff_text = cutoff.isoformat()
-        else:
-            cutoff_text = None
-        where_live = "WHERE (m.is_active = 1 OR m.id IS NULL)"
-        params: list[Any] = []
-        if cutoff_text:
-            where_live += " AND COALESCE(a.pub_date, a.created_at) >= ?"
-            params.append(cutoff_text)
         rows = self.query(
-            f"""
-            SELECT s.module_id AS module_id, s.topic_id AS topic_id, COUNT(*) AS n
+            """
+            SELECT a.id AS id, a.title AS title, a.content AS content,
+                   a.pub_date AS pub_date, a.created_at AS created_at,
+                   s.module_id AS module_id, s.topic_id AS topic_id,
+                   IFNULL(a.is_saved, 0) AS is_saved,
+                   (m.is_active = 1 OR m.id IS NULL) AS module_on
             FROM articles a
             LEFT JOIN sources s ON s.id = a.source_id
             LEFT JOIN modules m ON m.id = s.module_id
-            {where_live}
-            GROUP BY s.module_id, s.topic_id
-            """,
-            params,
+            """
         )
+        filters = self.list_filters()
         live_total = 0
-        for row in rows:
-            module_id = row["module_id"]
-            topic_id = row["topic_id"]
-            total = int(row["n"] or 0)
-            live_total += total
-            if module_id:
-                counts[module_id] += total
-            if topic_id:
-                counts[topic_id] += total
-                parent = parent_topic_id(topic_id)
-                if parent:
-                    counts[parent] += total
-        counts["all"] = live_total
-        saved_rows = self.query(
-            """
-            SELECT s.module_id AS module_id, s.topic_id AS topic_id, COUNT(*) AS n
-            FROM articles a
-            LEFT JOIN sources s ON s.id = a.source_id
-            WHERE IFNULL(a.is_saved, 0) = 1
-            GROUP BY s.module_id, s.topic_id
-            """
-        )
         archive_total = 0
-        for row in saved_rows:
-            total = int(row["n"] or 0)
-            archive_total += total
+        for row in rows:
+            instant = _aware(_parse_dt(row["pub_date"])) or _aware(_parse_dt(row["created_at"]))
+            is_live = bool(row["module_on"]) and (
+                cutoff is None or (instant is not None and instant >= cutoff)
+            )
+            if not is_live and not row["is_saved"]:
+                continue
+            if not _passes_keyword_filters(row["title"], row["content"], filters):
+                continue
             module_id = row["module_id"]
-            topic_id = row["topic_id"]
-            if module_id:
-                counts[f"archive:{module_id}"] += total
-            if topic_id:
-                counts[f"archive:{topic_id}"] += total
-                parent = parent_topic_id(topic_id)
-                if parent:
-                    counts[f"archive:{parent}"] += total
+            leaf = self._leaf_for_row(row)
+            keys = [key for key in (module_id, leaf, parent_topic_id(leaf) if leaf else None) if key]
+            if is_live:
+                live_total += 1
+                for key in keys:
+                    counts[key] += 1
+            if row["is_saved"]:
+                archive_total += 1
+                for key in keys:
+                    counts[f"archive:{key}"] += 1
+        counts["all"] = live_total
         counts["archive"] = archive_total
         return self._cap_headline_counts(dict(counts), cap)
+
+    def _leaf_for_row(self, row: sqlite3.Row) -> str | None:
+        """Same leaf the headline list files the story under, cached per article."""
+        from core.topic_classifier import assign_leaf_topic
+
+        content = row["content"] or ""
+        key = (int(row["id"]), row["topic_id"], row["title"], len(content))
+        cache = self._leaf_cache
+        if key not in cache:
+            if len(cache) > 20000:
+                cache.clear()
+            cache[key] = assign_leaf_topic(row["module_id"], row["topic_id"], row["title"], content)
+        return cache[key]
 
     def _leaf_ids_for_scope(self, module_id: str | None, topic_ids: list[str] | None) -> list[str]:
         found: list[str] = []
@@ -1404,11 +1399,17 @@ def _aware(value: Optional[datetime]) -> Optional[datetime]:
 
 
 def _apply_keyword_filters(article: Article, filters: list[UserFilter]) -> Article | None:
-    text = f"{article.title} {article.content or ''}".lower()
+    return article if _passes_keyword_filters(article.title, article.content, filters) else None
+
+
+def _passes_keyword_filters(title: str | None, content: str | None, filters: list[UserFilter]) -> bool:
+    if not filters:
+        return True
+    text = f"{title} {content or ''}".lower()
     whitelist = [f.keyword.lower() for f in filters if f.filter_type == "whitelist"]
     blacklist = [f.keyword.lower() for f in filters if f.filter_type == "blacklist"]
     if blacklist and any(word in text for word in blacklist):
-        return None
+        return False
     if whitelist and not any(word in text for word in whitelist):
-        return None
-    return article
+        return False
+    return True

@@ -173,6 +173,20 @@ class YahooLookupWorker(QThread):
         super().__init__(parent)
         self.query = query
 
+
+LIVE_LOOKUPS: set[YahooLookupWorker] = set()
+
+
+def start_lookup(query: str, on_done) -> YahooLookupWorker:
+    """Parentless so closing a dialog never destroys a running lookup thread."""
+    worker = YahooLookupWorker(query)
+    LIVE_LOOKUPS.add(worker)
+    worker.finished_ok.connect(on_done)
+    worker.finished.connect(lambda w=worker: LIVE_LOOKUPS.discard(w))
+    worker.finished.connect(worker.deleteLater)
+    worker.start()
+    return worker
+
     def run(self) -> None:
         try:
             items = lookup_yahoo(self.query)

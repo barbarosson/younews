@@ -10,11 +10,13 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QSizePolicy,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
 
+from config import DEFAULT_THEME, normalize_theme
 from core.i18n_manager import I18nManager
 
 ROLE_USER = "user"
@@ -33,6 +35,7 @@ class ChatPanel(QFrame):
         self._db = db
         self._history: list[dict[str, str]] = []
         self._busy = False
+        self._theme = normalize_theme(db.get_setting("theme", DEFAULT_THEME) if db else DEFAULT_THEME)
 
         self.title_label = QLabel()
         self.title_label.setObjectName("paneTitle")
@@ -139,12 +142,30 @@ class ChatPanel(QFrame):
             widget = item.widget()
             if widget:
                 widget.deleteLater()
+        self._suggestion_buttons = []
         for text in items[:4]:
             button = QPushButton(text)
             button.setObjectName("ghostButton")
             button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.setToolTip(text)
+            button.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
             button.clicked.connect(lambda _checked=False, value=text: self._use_suggestion(value))
             self.suggestions_layout.addWidget(button)
+            self._suggestion_buttons.append((button, text))
+        self._elide_suggestions()
+
+    def _elide_suggestions(self) -> None:
+        for button, text in getattr(self, "_suggestion_buttons", []):
+            room = max(40, self.width() - 52)
+            button.setText(button.fontMetrics().elidedText(text, Qt.TextElideMode.ElideRight, room))
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._elide_suggestions()
+
+    def set_theme(self, theme: str | None) -> None:
+        self._theme = normalize_theme(theme)
+        self._render()
 
     def _use_suggestion(self, text: str) -> None:
         if self._busy:
@@ -194,15 +215,20 @@ class ChatPanel(QFrame):
         self.log.verticalScrollBar().setValue(self.log.verticalScrollBar().maximum())
 
     def _wrap(self, inner: str) -> str:
+        light = self._theme == "light"
+        if light:
+            text, user_bg, bot_bg, link = "#1f2328", "#dbeafe", "#ffffff", "#0969da"
+        else:
+            text, user_bg, bot_bg, link = "#e6edf3", "#1d2d44", "#182433", "#58a6ff"
         return (
             "<html><head><style>"
-            "body{font-family:'Segoe UI';font-size:13px;}"
+            f"body{{font-family:'Segoe UI';font-size:13px;color:{text};}}"
             ".welcome{margin:8px 0;}"
-            ".user,.bot{margin:0 0 12px 0;padding:8px 10px;border-radius:10px;color:#e6edf3;}"
-            ".user{background:#1d2d44;}"
-            ".bot{background:#182433;}"
+            f".user,.bot{{margin:0 0 12px 0;padding:8px 10px;border-radius:10px;color:{text};}}"
+            f".user{{background:{user_bg};}}"
+            f".bot{{background:{bot_bg};}}"
             ".who{font-size:11px;opacity:.7;margin-bottom:4px;font-weight:700;}"
-            "a{color:#58a6ff;}"
+            f"a{{color:{link};}}"
             "</style></head><body>"
             f"{inner}</body></html>"
         )

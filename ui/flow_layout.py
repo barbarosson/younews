@@ -47,6 +47,8 @@ class FlowLayout(QLayout):
     def minimumSize(self) -> QSize:  # noqa: N802
         size = QSize()
         for item in self._items:
+            if item.isEmpty():
+                continue
             size = size.expandedTo(item.minimumSize())
         margins = self.contentsMargins()
         return size + QSize(margins.left() + margins.right(), margins.top() + margins.bottom())
@@ -61,6 +63,8 @@ class FlowLayout(QLayout):
         line_height = 0
         gap = self.spacing()
         for item in self._items:
+            if item.isEmpty():
+                continue
             hint = item.sizeHint()
             if x > left and x + hint.width() > right + 1:
                 x = left
