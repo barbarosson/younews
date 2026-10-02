@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSplitter,
     QTabWidget,
     QTreeWidget,
     QTreeWidgetItem,
@@ -57,6 +58,8 @@ from ui.components.social_tab import SocialFollowsTab
 from ui.components.sources_tab import SourcesTab
 from ui.components.tutorial_panel import TutorialPanel
 from ui.theme import apply_app_theme
+
+_LIVE_LOOKUPS: set[YahooLookupWorker] = set()
 
 PROVIDER_LABEL_KEYS: tuple[tuple[str, str], ...] = (
     ("openai", "app.openai"),
@@ -188,7 +191,16 @@ class SettingsDialog(QDialog):
         self.ticker_list = QListWidget()
         self.ticker_list.setDragDropMode(QListWidget.DragDropMode.InternalMove)
         self.ticker_search = QLineEdit()
-        self.ticker_preset = QComboBox()
+        self.ticker_search.setClearButtonEnabled(True)
+        self.ticker_search.installEventFilter(self)
+        self.ticker_results_status = QLabel()
+        self.ticker_results_status.setObjectName("mutedLabel")
+        self.ticker_results = QListWidget()
+        self.ticker_results.setAlternatingRowColors(True)
+        self.ticker_results.setUniformItemSizes(True)
+        compact_rows = "QListWidget::item { padding: 4px 10px; min-height: 0px; }"
+        self.ticker_results.setStyleSheet(compact_rows)
+        self.ticker_list.setStyleSheet(compact_rows)
         self.ticker_symbol = QLineEdit()
         self.ticker_label_edit = QLineEdit()
         self.ticker_add = QPushButton()
@@ -200,7 +212,7 @@ class SettingsDialog(QDialog):
         self._yahoo_thread: YahooLookupWorker | None = None
         self._ticker_debounce = QTimer(self)
         self._ticker_debounce.setSingleShot(True)
-        self._ticker_debounce.setInterval(350)
+        self._ticker_debounce.setInterval(250)
         self._ticker_debounce.timeout.connect(self._start_yahoo_ticker_search)
         self.license_status = QLabel()
         self.license_status.setWordWrap(True)
@@ -313,18 +325,30 @@ class SettingsDialog(QDialog):
         tickers_tab = QWidget()
         tickers_layout = QVBoxLayout(tickers_tab)
         tickers_layout.addWidget(self.tickers_hint)
-        tickers_layout.addWidget(self.tickers_current_label)
-        tickers_layout.addWidget(self.ticker_list, 1)
-        tickers_layout.addWidget(self.ticker_remove, 0, Qt.AlignmentFlag.AlignLeft)
-        tickers_layout.addWidget(self.ticker_search)
-        tickers_layout.addWidget(self.ticker_preset)
+        tape_panel = QWidget()
+        tape_layout = QVBoxLayout(tape_panel)
+        tape_layout.setContentsMargins(0, 0, 6, 0)
+        tape_layout.addWidget(self.tickers_current_label)
+        tape_layout.addWidget(self.ticker_list, 1)
+        tape_layout.addWidget(self.ticker_remove, 0, Qt.AlignmentFlag.AlignLeft)
+        search_panel = QWidget()
+        search_layout = QVBoxLayout(search_panel)
+        search_layout.setContentsMargins(6, 0, 0, 0)
+        search_layout.addWidget(self.ticker_search)
+        search_layout.addWidget(self.ticker_results_status)
+        search_layout.addWidget(self.ticker_results, 1)
         ticker_add_row = QHBoxLayout()
         ticker_add_row.addWidget(self.ticker_symbol, 2)
         ticker_add_row.addWidget(self.ticker_label_edit, 2)
-        ticker_actions = FlowLayout()
-        ticker_actions.addWidget(self.ticker_add)
-        tickers_layout.addLayout(ticker_add_row)
-        tickers_layout.addLayout(ticker_actions)
+        ticker_add_row.addWidget(self.ticker_add, 0)
+        search_layout.addLayout(ticker_add_row)
+        ticker_split = QSplitter(Qt.Orientation.Horizontal)
+        ticker_split.setChildrenCollapsible(False)
+        ticker_split.addWidget(tape_panel)
+        ticker_split.addWidget(search_panel)
+        ticker_split.setStretchFactor(0, 2)
+        ticker_split.setStretchFactor(1, 3)
+        tickers_layout.addWidget(ticker_split, 1)
         self._tickers_tab_index = self.tabs.addTab(tickers_tab, "")
         license_tab = QWidget()
         license_layout = QVBoxLayout(license_tab)
@@ -356,8 +380,10 @@ class SettingsDialog(QDialog):
         self.ticker_add.clicked.connect(self._add_ticker)
         self.ticker_remove.clicked.connect(self._remove_ticker)
         self.ticker_symbol.returnPressed.connect(self._add_ticker)
-        self.ticker_preset.activated.connect(self._on_ticker_preset)
         self.ticker_search.textChanged.connect(self._on_ticker_search_changed)
+        self.ticker_search.returnPressed.connect(self._add_selected_result)
+        self.ticker_results.itemActivated.connect(lambda _item: self._add_selected_result())
+        self.ticker_results.currentItemChanged.connect(self._on_ticker_result_changed)
         self.pack_tr.clicked.connect(lambda: self._apply_pack("tr"))
         self.pack_us.clicked.connect(lambda: self._apply_pack("us"))
         self.pack_eu.clicked.connect(lambda: self._apply_pack("eu"))
@@ -837,71 +863,180 @@ class SettingsDialog(QDialog):
             self._db.delete_filter(int(filter_id))
             self._reload_filters()
 
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802
+        if obj is getattr(self, "ticker_search", None) and event.type() == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Down and self.ticker_results.count():
+                self.ticker_results.setFocus()
+                if self.ticker_results.currentRow() < 0:
+                    self._select_first_result()
+                return True
+        return super().eventFilter(obj, event)
+
     def _on_ticker_search_changed(self, _text: str = "") -> None:
         query = self.ticker_search.text().strip()
         if _fold(query) != _fold(self._yahoo_query):
             self._yahoo_hits = []
             self._yahoo_query = ""
-        self._rebuild_ticker_presets()
         if len(_fold(query)) < 2:
             self._ticker_debounce.stop()
-            return
-        self._ticker_debounce.start()
+        else:
+            self._ticker_debounce.start()
+        self._rebuild_ticker_presets()
 
     def _start_yahoo_ticker_search(self) -> None:
         query = self.ticker_search.text().strip()
         if len(_fold(query)) < 2:
             return
-        worker = YahooLookupWorker(query, self)
+        worker = YahooLookupWorker(query)
+        _LIVE_LOOKUPS.add(worker)
         worker.finished_ok.connect(self._on_yahoo_tickers)
+        worker.finished.connect(lambda w=worker: _LIVE_LOOKUPS.discard(w))
         worker.finished.connect(worker.deleteLater)
         worker.start()
         self._yahoo_thread = worker
+        self._update_results_status(searching=True)
 
     def _on_yahoo_tickers(self, query: str, items: list) -> None:
         if _fold(query) != _fold(self.ticker_search.text()):
             return
+        self._yahoo_thread = None
         self._yahoo_query = query
         self._yahoo_hits = [item for item in items if isinstance(item, CatalogTicker)]
         self._rebuild_ticker_presets()
 
     def _rebuild_ticker_presets(self) -> None:
-        current = self.ticker_preset.currentData()
-        self.ticker_preset.blockSignals(True)
-        self.ticker_preset.clear()
-        self.ticker_preset.addItem(self._i18n.t("tickers.presets"), None)
-        last_cat = None
+        current = self._selected_result()
+        on_tape = {symbol.casefold() for symbol, _label in self._ticker_rows}
         query = self.ticker_search.text() if hasattr(self, "ticker_search") else ""
         yahoo = self._yahoo_hits if _fold(self._yahoo_query) == _fold(query) else []
         local_symbols = {item.symbol.casefold() for item in search_catalog(query, limit=80)}
-        items = merge_ticker_search(query, yahoo, catalog_limit=80, total_limit=120)
-        yahoo_header_done = False
+        merged = merge_ticker_search(query, yahoo, catalog_limit=80, total_limit=120)
+        groups: dict[str, list[CatalogTicker]] = {}
+        for entry in merged:
+            key = "\0yahoo" if entry.symbol.casefold() not in local_symbols else entry.category
+            groups.setdefault(key, []).append(entry)
+        yahoo_group = groups.pop("\0yahoo", [])
+        items = [entry for group in groups.values() for entry in group] + yahoo_group
+        results = self.ticker_results
+        results.blockSignals(True)
+        results.clear()
+        header_font = results.font()
+        header_font.setBold(True)
+        last_header = None
+        restore_row = -1
         for item in items:
             is_yahoo = item.symbol.casefold() not in local_symbols
-            if is_yahoo and not yahoo_header_done:
-                self.ticker_preset.addItem(f"— {self._i18n.t('tickers.yahoo_section')} —", None)
-                header_item = self.ticker_preset.model().item(self.ticker_preset.count() - 1)
-                if header_item is not None:
-                    header_item.setEnabled(False)
-                yahoo_header_done = True
-                last_cat = None
-            elif not is_yahoo and item.category != last_cat:
-                header = self._i18n.t(f"tickers.cat.{item.category}", item.category.title())
-                self.ticker_preset.addItem(f"— {header} —", None)
-                header_item = self.ticker_preset.model().item(self.ticker_preset.count() - 1)
-                if header_item is not None:
-                    header_item.setEnabled(False)
-                last_cat = item.category
-            self.ticker_preset.addItem(f"{item.label}  ·  {item.country}", (item.symbol, item.label))
-        if current:
-            idx = self.ticker_preset.findData(current)
-            if idx >= 0:
-                self.ticker_preset.setCurrentIndex(idx)
-        self.ticker_preset.blockSignals(False)
+            header = (
+                self._i18n.t("tickers.yahoo_section")
+                if is_yahoo
+                else self._i18n.t(f"tickers.cat.{item.category}", item.category.title())
+            )
+            if header != last_header:
+                head = QListWidgetItem(header.upper())
+                head.setFlags(Qt.ItemFlag.NoItemFlags)
+                head.setFont(header_font)
+                results.addItem(head)
+                last_header = header
+            added = item.symbol.casefold() in on_tape
+            country = f"  ·  {item.country}" if item.country else ""
+            text = f"{item.label}    {item.symbol}{country}"
+            if added:
+                text += f"    ✓ {self._i18n.t('tickers.on_tape')}"
+            row = QListWidgetItem(text)
+            row.setData(Qt.ItemDataRole.UserRole, (item.symbol, item.label))
+            row.setToolTip(f"{item.label} ({item.symbol})")
+            if added:
+                row.setFlags(Qt.ItemFlag.NoItemFlags)
+            results.addItem(row)
+            if current and current[0] == item.symbol and not added:
+                restore_row = results.count() - 1
+        if restore_row >= 0:
+            results.setCurrentRow(restore_row)
+        results.blockSignals(False)
+        self._update_results_status(searching=self._yahoo_pending(query))
+
+    def _yahoo_pending(self, query: str) -> bool:
+        if len(_fold(query)) < 2 or _fold(self._yahoo_query) == _fold(query):
+            return False
+        return self._ticker_debounce.isActive() or self._yahoo_thread is not None
+
+    def _result_count(self) -> int:
+        return sum(
+            1
+            for index in range(self.ticker_results.count())
+            if self.ticker_results.item(index).data(Qt.ItemDataRole.UserRole)
+        )
+
+    def _update_results_status(self, *, searching: bool = False) -> None:
+        count = self._result_count()
+        query = self.ticker_search.text().strip()
+        if searching and query:
+            text = self._i18n.t("tickers.searching")
+        elif query and not count:
+            text = self._i18n.t("tickers.no_results")
+        else:
+            text = self._i18n.t("tickers.results_count").replace("{count}", str(count))
+        self.ticker_results_status.setText(text)
+
+    def _selected_result(self) -> tuple[str, str] | None:
+        if not hasattr(self, "ticker_results"):
+            return None
+        item = self.ticker_results.currentItem()
+        data = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        if not data or not (item.flags() & Qt.ItemFlag.ItemIsEnabled):
+            return None
+        return str(data[0]), str(data[1])
+
+    def _select_first_result(self) -> bool:
+        for index in range(self.ticker_results.count()):
+            item = self.ticker_results.item(index)
+            if item.data(Qt.ItemDataRole.UserRole) and item.flags() & Qt.ItemFlag.ItemIsEnabled:
+                self.ticker_results.setCurrentRow(index)
+                return True
+        return False
+
+    def _on_ticker_result_changed(self, *_args) -> None:
+        data = self._selected_result()
+        if data:
+            self.ticker_symbol.setText(data[0])
+            self.ticker_label_edit.setText(data[1])
+
+    def _add_selected_result(self) -> None:
+        if self._selected_result() is None and not self._select_first_result():
+            return
+        data = self._selected_result()
+        if data and self._append_ticker(*data):
+            row = self.ticker_results.currentRow()
+            self._rebuild_ticker_presets()
+            for index in range(row, self.ticker_results.count()):
+                item = self.ticker_results.item(index)
+                if item.data(Qt.ItemDataRole.UserRole) and item.flags() & Qt.ItemFlag.ItemIsEnabled:
+                    self.ticker_results.setCurrentRow(index)
+                    break
+            self.ticker_results_status.setText(self._i18n.t("tickers.added").replace("{name}", data[1]))
+
+    def _append_ticker(self, symbol: str, label: str) -> bool:
+        symbol = symbol.strip()
+        label = (label or "").strip() or symbol
+        if not symbol:
+            return False
+        if any(existing.casefold() == symbol.casefold() for existing, _ in self._ticker_rows):
+            QMessageBox.information(
+                self, self._i18n.t("tickers.title"), self._i18n.t("tickers.duplicate")
+            )
+            return False
+        self._ticker_rows.append((symbol, label))
+        self.ticker_symbol.clear()
+        self.ticker_label_edit.clear()
+        self._refresh_ticker_list()
+        self.ticker_list.setCurrentRow(self.ticker_list.count() - 1)
+        self.ticker_results_status.setText(self._i18n.t("tickers.added").replace("{name}", label))
+        return True
 
     def _load_tickers(self) -> None:
         self._ticker_rows = [(item.symbol, item.label) for item in self._db.list_tickers()]
         self._refresh_ticker_list()
+        self._rebuild_ticker_presets()
 
     def _refresh_ticker_list(self) -> None:
         self.ticker_list.clear()
@@ -910,17 +1045,10 @@ class SettingsDialog(QDialog):
             row.setData(Qt.ItemDataRole.UserRole, (symbol, label))
             self.ticker_list.addItem(row)
 
-    def _on_ticker_preset(self, _index: int) -> None:
-        data = self.ticker_preset.currentData()
-        if not data:
-            return
-        self.ticker_symbol.setText(str(data[0]))
-        self.ticker_label_edit.setText(str(data[1]))
-
     def _add_ticker(self) -> None:
         typed = self.ticker_symbol.text().strip()
         label = self.ticker_label_edit.text().strip()
-        preset = self.ticker_preset.currentData()
+        preset = self._selected_result()
         symbol = typed
         yahoo_like = any(ch in typed for ch in "^=.") or (typed.isupper() and len(typed) <= 6)
         if preset and (
@@ -950,16 +1078,9 @@ class SettingsDialog(QDialog):
                 self, self._i18n.t("tickers.title"), self._i18n.t("tickers.empty_symbol")
             )
             return
-        label = label or symbol
-        if any(existing.casefold() == symbol.casefold() for existing, _ in self._ticker_rows):
-            QMessageBox.information(
-                self, self._i18n.t("tickers.title"), self._i18n.t("tickers.duplicate")
-            )
-            return
-        self._ticker_rows.append((symbol, label))
-        self.ticker_symbol.clear()
-        self.ticker_label_edit.clear()
-        self._refresh_ticker_list()
+        if self._append_ticker(symbol, label):
+            self._rebuild_ticker_presets()
+            self.ticker_results_status.setText(self._i18n.t("tickers.added").replace("{name}", label or symbol))
 
     def _remove_ticker(self) -> None:
         row = self.ticker_list.currentRow()
@@ -967,6 +1088,7 @@ class SettingsDialog(QDialog):
             return
         del self._ticker_rows[row]
         self._refresh_ticker_list()
+        self._rebuild_ticker_presets()
 
     def _on_theme(self) -> None:
         theme = normalize_theme(self.theme_combo.currentData())
