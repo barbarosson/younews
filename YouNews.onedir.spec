@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec for You News (Windows exe)."""
+"""PyInstaller onedir spec for You News (MSIX layout)."""
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
 
@@ -33,6 +33,10 @@ hiddenimports = [
     "core.license",
     "core.store_license",
     "core._embedded_hmac",
+    "winrt.windows.services.store",
+    "winrt.windows.applicationmodel",
+    "winrt.windows.foundation",
+    "winrt.runtime",
 ]
 hiddenimports += collect_submodules("keyring.backends")
 hiddenimports += collect_submodules("yfinance")
@@ -65,17 +69,13 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name="YouNews",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    upx_exclude=[],
-    runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -83,4 +83,15 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon="ui/assets/you_news_icon.ico",
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name="YouNews",
 )

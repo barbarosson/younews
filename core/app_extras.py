@@ -448,6 +448,13 @@ def humanize_source_error(raw: str, i18n=None) -> str:
 
     if not text:
         return t("sources.error_generic", "Could not fetch this source.")
+    if "html_not_rss" in low:
+        return t(
+            "sources.error_html",
+            "That address looks like a web page, not an RSS feed. Use Find RSS or paste a feed URL.",
+        )
+    if "empty_feed" in low or "test_empty" in low:
+        return t("sources.test_empty", "The address responded, but no headlines were found.")
     if "timed out" in low or "timeout" in low:
         return t("sources.error_timeout", "Timed out — the site did not answer in time.")
     if "name or service not known" in low or "getaddrinfo" in low or "nodename" in low:
@@ -456,14 +463,80 @@ def humanize_source_error(raw: str, i18n=None) -> str:
         return t("sources.error_ssl", "Secure connection failed. Check the URL or try later.")
     if "not well-formed" in low or ("syntax error" in low) or ("xml" in low and "parse" in low):
         return t("sources.error_parse", "The feed could not be read. It may not be a valid RSS/Atom URL.")
+    if "<html" in low or "<!doctype" in low or text.lstrip().startswith("<"):
+        return t(
+            "sources.error_html",
+            "That address looks like a web page, not an RSS feed. Use Find RSS or paste a feed URL.",
+        )
     match = re.search(r"\b([45]\d{2})\b", text)
     if match and ("http" in low or "status" in low or "client error" in low or "server error" in low):
         return t("sources.error_http", "The site returned an error (HTTP {code}).").replace(
             "{code}", match.group(1)
         )
-    if len(text) > 160:
-        text = text[:157].rstrip() + "…"
-    return text
+    # Never dump long provider / HTML bodies into the UI.
+    cleaned = re.sub(r"<[^>]+>", " ", text)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if len(cleaned) > 140:
+        cleaned = cleaned[:137].rstrip() + "…"
+    return cleaned or t("sources.error_generic", "Could not fetch this source.")
+
+
+def humanize_ai_error(raw: str, i18n=None) -> str:
+    """Short, safe AI/provider errors for dialogs and chat."""
+
+    def t(key: str, default: str) -> str:
+        if i18n is None:
+            return default
+        return i18n.t(key, default)
+
+    text = (raw or "").strip()
+    low = text.lower()
+    if not text:
+        return t("ai.error", "AI request failed.")
+    if "missing_api_key" in low or "missing_openai_key" in low or "no api key" in low:
+        return t("ai.no_key", "Add your API key in Settings first.")
+    if "401" in low or "invalid_api_key" in low or "incorrect api key" in low:
+        return t("ai.error_auth", "The AI provider rejected the API key. Check Settings.")
+    if "429" in low or "rate limit" in low or "quota" in low:
+        return t("ai.error_rate", "The AI provider rate-limited the request. Try again in a moment.")
+    if "timeout" in low or "timed out" in low:
+        return t("ai.error_timeout", "The AI provider timed out. Try again.")
+    if "connection" in low or "network" in low:
+        return t("ai.error_network", "Could not reach the AI provider. Check your connection.")
+    cleaned = re.sub(r"<[^>]+>", " ", text)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if len(cleaned) > 160:
+        cleaned = cleaned[:157].rstrip() + "…"
+    prefix = t("ai.error", "AI request failed.")
+    if cleaned and cleaned not in prefix:
+        return f"{prefix} {cleaned}"
+    return prefix
+
+
+def latest_site_version(base_url: str) -> dict:
+    """Fetch {version, url, notes} from younews.media/version.json."""
+    import httpx
+
+    root = (base_url or "https://younews.media").rstrip("/")
+    url = f"{root}/version.json"
+    try:
+        with httpx.Client(timeout=8.0, headers={"User-Agent": RSS_USER_AGENT}, **httpx_proxy_kwargs()) as client:
+            response = client.get(url)
+            if response.status_code != 200:
+                return {}
+            data = response.json()
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    version = str(data.get("version") or "").strip()
+    if not version:
+        return {}
+    return {
+        "version": version.lstrip("v"),
+        "url": str(data.get("url") or root).strip(),
+        "notes": str(data.get("notes") or "").strip(),
+    }
 
 
 def latest_github_release(repo: str) -> str:

@@ -227,6 +227,13 @@ def stored_key() -> str | None:
 
 
 def is_activated() -> bool:
+    try:
+        from core.store_license import is_store_licensed, uses_store_licensing
+
+        if uses_store_licensing():
+            return is_store_licensed()
+    except Exception:
+        pass
     key = stored_key()
     if not key:
         return False
@@ -270,6 +277,23 @@ def masked_key(key: str | None = None) -> str:
 
 
 def license_status() -> dict[str, Any]:
+    try:
+        from core.store_license import store_license_status, uses_store_licensing
+
+        if uses_store_licensing():
+            store = store_license_status()
+            return {
+                "activated": bool(store.get("is_active")),
+                "email": "",
+                "masked": "Microsoft Store" if store.get("is_active") else "",
+                "machine": machine_fingerprint()[:12],
+                "gate": license_gate_required(),
+                "store": True,
+                "trial": bool(store.get("trial")),
+                "store_error": str(store.get("error") or ""),
+            }
+    except Exception:
+        pass
     activated = is_activated()
     payload: dict[str, Any] = {}
     key = stored_key()
@@ -284,4 +308,7 @@ def license_status() -> dict[str, Any]:
         "masked": masked_key(key) if activated else "",
         "machine": machine_fingerprint()[:12],
         "gate": license_gate_required(),
+        "store": False,
+        "trial": False,
+        "store_error": "",
     }

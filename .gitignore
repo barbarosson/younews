@@ -25,3 +25,6 @@ build/
 /secrets/
 core/_embedded_hmac.py
 tools/issue_license.py
+
+# Local MSIX layout / packaging certs live under secrets or dist
+dist/msix_layout/

@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFormLayout,
-    QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
@@ -27,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from config import SOCIAL_MODULE_ID
+from ui.flow_layout import FlowLayout
 from core.i18n_manager import I18nManager
 from core.rss_engine import refresh_one_rss
 from core.source_probe import SourceProbeResult, probe_source
@@ -93,6 +93,8 @@ class SourcesTab(QWidget):
         self.test_log.setMaximumHeight(150)
 
         form = QFormLayout()
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         form.addRow(self.name_label, self.source_name)
         form.addRow(self.url_label, self.source_url)
         form.addRow(self.module_label, self.module_combo)
@@ -100,7 +102,8 @@ class SourcesTab(QWidget):
         form.addRow(self.kind_label, self.kind_combo)
         form.addRow(self.css_label, self.css_edit)
 
-        buttons = QHBoxLayout()
+        self.refresh_edit.setMaximumWidth(72)
+        buttons = FlowLayout()
         buttons.addWidget(self.add_btn)
         buttons.addWidget(self.test_btn)
         buttons.addWidget(self.remove_btn)
@@ -109,7 +112,6 @@ class SourcesTab(QWidget):
         buttons.addWidget(self.refresh_edit)
         buttons.addWidget(self.opml_import)
         buttons.addWidget(self.opml_export)
-        buttons.addStretch(1)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)

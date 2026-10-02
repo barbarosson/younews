@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from config import SOCIAL_FOLLOW_LIMIT, SOCIAL_MODULE_ID
+from ui.flow_layout import FlowLayout
 from core.i18n_manager import I18nManager
 from core.social_resolve import PLATFORMS, SUPPORTED, SocialResolveError, TOPIC_IDS, detect_platform, resolve_follow
 from core.source_probe import probe_source
@@ -65,13 +66,15 @@ class SocialFollowsTab(QWidget):
         row = QHBoxLayout()
         row.addWidget(self.platform)
         row.addWidget(self.handle, 1)
-        row.addWidget(self.test_btn)
-        row.addWidget(self.add_btn)
+        actions = FlowLayout()
+        actions.addWidget(self.test_btn)
+        actions.addWidget(self.add_btn)
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.hint)
         layout.addWidget(self.limit_label)
         layout.addLayout(row)
+        layout.addLayout(actions)
         layout.addWidget(self.table, 1)
         layout.addWidget(self.remove_btn, 0, Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(self.test_log_label)

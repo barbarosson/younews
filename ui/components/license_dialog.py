@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 
 from config import APP_PROMO_URL
 from core.i18n_manager import I18nManager
-from core.license import LicenseError, activate
+from core.license import LicenseError, activate, is_activated
 from ui.branding import apply_mascot
 
 _SUPPORT_MAIL = "mailto:hello@younews.media"
@@ -28,6 +28,13 @@ class LicenseDialog(QDialog):
         super().__init__(parent)
         self._i18n = i18n
         self._ok = False
+        self._store = False
+        try:
+            from core.store_license import uses_store_licensing
+
+            self._store = uses_store_licensing()
+        except Exception:
+            self._store = False
         self.setWindowTitle(i18n.t("license.title"))
         self.setModal(True)
         self.setMinimumWidth(480)
@@ -35,13 +42,19 @@ class LicenseDialog(QDialog):
         mascot.setAlignment(Qt.AlignmentFlag.AlignCenter)
         if not apply_mascot(mascot, 96):
             mascot.hide()
-        heading = QLabel(i18n.t("license.heading"))
+        heading = QLabel(
+            i18n.t("license.store_heading") if self._store else i18n.t("license.heading")
+        )
         heading.setWordWrap(True)
-        body = QLabel(i18n.t("license.body"))
+        body = QLabel(
+            i18n.t("license.store_body") if self._store else i18n.t("license.body")
+        )
         body.setWordWrap(True)
         self.key_edit = QLineEdit()
         self.key_edit.setPlaceholderText(i18n.t("license.placeholder"))
         self.key_edit.returnPressed.connect(self._activate)
+        if self._store:
+            self.key_edit.hide()
         links = QLabel(
             f'<a href="{_SITE}">{i18n.t("license.link_site")}</a>'
             f' · <a href="{_SITE}/contact.html">{i18n.t("license.link_help")}</a>'
@@ -50,7 +63,9 @@ class LicenseDialog(QDialog):
         links.setOpenExternalLinks(True)
         links.setWordWrap(True)
         links.setTextFormat(Qt.TextFormat.RichText)
-        activate_btn = QPushButton(i18n.t("license.activate"))
+        activate_btn = QPushButton(
+            i18n.t("license.store_continue") if self._store else i18n.t("license.activate")
+        )
         activate_btn.clicked.connect(self._activate)
         buy_btn = QPushButton(i18n.t("license.buy"))
         buy_btn.setObjectName("ghostButton")
@@ -79,9 +94,34 @@ class LicenseDialog(QDialog):
         self.reject()
 
     def _open_buy(self) -> None:
+        if self._store:
+            self._store_purchase()
+            return
         QDesktopServices.openUrl(QUrl(_SITE + "/#price"))
 
+    def _store_purchase(self) -> None:
+        from core.store_license import request_store_purchase
+
+        result = request_store_purchase()
+        if result.get("ok") and is_activated():
+            self._ok = True
+            self.accept()
+            return
+        err = str(result.get("error") or result.get("status") or "")
+        QMessageBox.warning(
+            self,
+            self._i18n.t("license.title"),
+            self._i18n.t("license.store_failed").replace("{error}", err or "—"),
+        )
+
     def _activate(self) -> None:
+        if self._store:
+            if is_activated():
+                self._ok = True
+                self.accept()
+                return
+            self._store_purchase()
+            return
         text = self.key_edit.text()
         if not text.strip():
             QMessageBox.warning(self, self._i18n.t("license.title"), self._i18n.t("license.empty"))

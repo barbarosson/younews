@@ -226,12 +226,6 @@ class Database:
             conn.execute("ALTER TABLE articles ADD COLUMN tags TEXT")
         if "folder" not in columns:
             conn.execute("ALTER TABLE articles ADD COLUMN folder TEXT")
-        if "note" not in columns:
-            conn.execute("ALTER TABLE articles ADD COLUMN note TEXT")
-        if "tags" not in columns:
-            conn.execute("ALTER TABLE articles ADD COLUMN tags TEXT")
-        if "folder" not in columns:
-            conn.execute("ALTER TABLE articles ADD COLUMN folder TEXT")
         source_columns = {row[1] for row in conn.execute("PRAGMA table_info(sources)")}
         if "user_added" not in source_columns:
             conn.execute("ALTER TABLE sources ADD COLUMN user_added BOOLEAN DEFAULT 0")

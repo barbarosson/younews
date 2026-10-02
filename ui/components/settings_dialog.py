@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.flow_layout import FlowLayout
 from config import (
     AI_PROVIDERS,
     CLOUD_AI_PROVIDERS,
@@ -70,6 +71,7 @@ PROVIDER_LABEL_KEYS: tuple[tuple[str, str], ...] = (
 class SettingsDialog(QDialog):
     theme_changed = Signal(str)
     mini_tape_requested = Signal()
+    license_deactivated = Signal()
 
     def __init__(self, db: Database, i18n: I18nManager, parent=None, initial_tab: str | None = None) -> None:
         super().__init__(parent)
@@ -84,7 +86,8 @@ class SettingsDialog(QDialog):
 
         self.tabs = QTabWidget()
         self.tabs.setUsesScrollButtons(True)
-        self.tabs.setElideMode(Qt.TextElideMode.ElideRight)
+        self.tabs.setElideMode(Qt.TextElideMode.ElideNone)
+        self.tabs.tabBar().setExpanding(False)
         self.language_combo = QComboBox()
         for code, name in UI_LANGUAGES.items():
             self.language_combo.addItem(name, code)
@@ -211,6 +214,8 @@ class SettingsDialog(QDialog):
 
         general = QWidget()
         form = QFormLayout(general)
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         form.addRow(self.lang_label, self.language_combo)
         form.addRow(self.theme_label, self.theme_combo)
         form.addRow(self.refresh_interval_label, self.refresh_interval_combo)
@@ -244,25 +249,25 @@ class SettingsDialog(QDialog):
         form.addRow(self.auto_update)
         form.addRow(self.github_repo)
         form.addRow(self.sync_folder)
-        help_row = QHBoxLayout()
+        help_row = FlowLayout()
         help_row.addWidget(self.help_site_btn)
         help_row.addWidget(self.help_privacy_btn)
         help_row.addWidget(self.help_refund_btn)
         help_row.addWidget(self.help_email_btn)
         form.addRow(help_row)
-        extra_row = QHBoxLayout()
+        extra_row = FlowLayout()
         extra_row.addWidget(self.vacuum_btn)
         extra_row.addWidget(self.cache_btn)
         extra_row.addWidget(self.about_btn)
         extra_row.addWidget(self.mini_tape_btn)
         form.addRow(extra_row)
-        pack_row = QHBoxLayout()
+        pack_row = FlowLayout()
         pack_row.addWidget(self.pack_tr)
         pack_row.addWidget(self.pack_us)
         pack_row.addWidget(self.pack_eu)
         pack_row.addWidget(self.pack_mastodon)
         form.addRow(pack_row)
-        backup_row = QHBoxLayout()
+        backup_row = FlowLayout()
         backup_row.addWidget(self.backup_btn)
         backup_row.addWidget(self.restore_btn)
         form.addRow(backup_row)
@@ -285,8 +290,10 @@ class SettingsDialog(QDialog):
         add_row = QHBoxLayout()
         add_row.addWidget(self.filter_keyword, 1)
         add_row.addWidget(self.filter_type)
-        add_row.addWidget(self.filter_add)
+        filter_actions = FlowLayout()
+        filter_actions.addWidget(self.filter_add)
         filters_layout.addLayout(add_row)
+        filters_layout.addLayout(filter_actions)
         filters_layout.addWidget(self.filter_list, 1)
         filters_layout.addWidget(self.filter_remove, 0, Qt.AlignmentFlag.AlignLeft)
 
@@ -310,8 +317,10 @@ class SettingsDialog(QDialog):
         ticker_add_row = QHBoxLayout()
         ticker_add_row.addWidget(self.ticker_symbol, 2)
         ticker_add_row.addWidget(self.ticker_label_edit, 2)
-        ticker_add_row.addWidget(self.ticker_add)
+        ticker_actions = FlowLayout()
+        ticker_actions.addWidget(self.ticker_add)
         tickers_layout.addLayout(ticker_add_row)
+        tickers_layout.addLayout(ticker_actions)
         self._tickers_tab_index = self.tabs.addTab(tickers_tab, "")
         license_tab = QWidget()
         license_layout = QVBoxLayout(license_tab)
@@ -319,10 +328,9 @@ class SettingsDialog(QDialog):
         license_layout.addWidget(self.license_machine)
         license_layout.addWidget(self.license_hint)
         license_layout.addWidget(self.license_key)
-        license_row = QHBoxLayout()
+        license_row = FlowLayout()
         license_row.addWidget(self.license_activate)
         license_row.addWidget(self.license_deactivate)
-        license_row.addStretch(1)
         license_layout.addLayout(license_row)
         license_layout.addStretch(1)
         self._license_tab_index = self.tabs.addTab(license_tab, "")
@@ -390,7 +398,7 @@ class SettingsDialog(QDialog):
         margin = 56
         max_w = max(520, avail.width() - margin)
         max_h = max(420, avail.height() - margin)
-        width = min(720, max_w)
+        width = min(1040, max_w)
         height = min(640, max_h)
         self.setMaximumSize(max_w, max_h)
         self.resize(width, height)
@@ -1100,15 +1108,30 @@ class SettingsDialog(QDialog):
         from core.license import license_status
 
         status = license_status()
-        if status["activated"]:
+        store = bool(status.get("store"))
+        self.license_key.setVisible(not store)
+        self.license_activate.setVisible(not store)
+        self.license_deactivate.setVisible(not store)
+        if store:
+            self.license_hint.setText(self._i18n.t("license.store_hint"))
+            if status["activated"]:
+                trial = self._i18n.t("license.store_trial_suffix") if status.get("trial") else ""
+                self.license_status.setText(
+                    self._i18n.t("license.store_active").replace("{trial}", trial)
+                )
+            else:
+                self.license_status.setText(self._i18n.t("license.inactive"))
+        elif status["activated"]:
             email = status["email"] or "—"
             self.license_status.setText(self._i18n.t("license.active").replace("{email}", email))
             if status["masked"]:
                 self.license_key.setPlaceholderText(status["masked"])
+            self.license_hint.setText(self._i18n.t("license.hint"))
         else:
             self.license_status.setText(self._i18n.t("license.inactive"))
+            self.license_hint.setText(self._i18n.t("license.hint"))
         self.license_machine.setText(self._i18n.t("license.machine").replace("{id}", str(status["machine"])))
-        self.license_deactivate.setEnabled(bool(status["activated"]))
+        self.license_deactivate.setEnabled(bool(status["activated"]) and not store)
 
     def _activate_license(self) -> None:
         from core.license import LicenseError, activate
@@ -1140,3 +1163,5 @@ class SettingsDialog(QDialog):
         deactivate()
         self.license_key.clear()
         self._refresh_license_tab()
+        self.license_deactivated.emit()
+        self.accept()

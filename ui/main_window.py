@@ -414,7 +414,17 @@ class MainWindow(QMainWindow):
             dialog.theme_changed.connect(lambda theme: self._apply_theme(theme, persist=False))
         if hasattr(dialog, "mini_tape_requested"):
             dialog.mini_tape_requested.connect(self._show_mini_tape)
+        locked_out = {"value": False}
+
+        def on_deactivated() -> None:
+            locked_out["value"] = True
+
+        if hasattr(dialog, "license_deactivated"):
+            dialog.license_deactivated.connect(on_deactivated)
         dialog.exec()
+        if locked_out["value"]:
+            self._relock_after_deactivate()
+            return
         reload = getattr(self.sidebar, "reload_modules", None) or getattr(self.sidebar, "reload_tree", None)
         if callable(reload):
             reload()
@@ -427,6 +437,23 @@ class MainWindow(QMainWindow):
         self._apply_layout_prefs()
         if dialog.result():
             self.market.refresh()
+
+    def _relock_after_deactivate(self) -> None:
+        """Close the desk until a license is active again (or quit)."""
+        from core.license import is_activated, license_gate_required
+        from ui.components.license_dialog import LicenseDialog
+
+        if not license_gate_required() or is_activated():
+            return
+        self.hide()
+        dialog = LicenseDialog(self.i18n, self)
+        if dialog.exec() == LicenseDialog.DialogCode.Accepted and is_activated():
+            self.show()
+            self.raise_()
+            return
+        from PySide6.QtWidgets import QApplication
+
+        QApplication.instance().quit()
 
     def _open_tutorials(self) -> None:
         dialog = TutorialDialog(self.i18n, self)
@@ -741,9 +768,9 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, self.i18n.t("app.settings"), self._ai_error_text(message))
 
     def _ai_error_text(self, message: str) -> str:
-        if "missing_api_key" in message or "missing_openai_key" in message:
-            return self.i18n.t("ai.no_key")
-        return f"{self.i18n.t('ai.error')} {message}"
+        from core.app_extras import humanize_ai_error
+
+        return humanize_ai_error(message, self.i18n)
 
     def _current_heading_label(self) -> str:
         module_id = self.sidebar.current_module_id()
@@ -1070,22 +1097,34 @@ class MainWindow(QMainWindow):
         self._check_updates()
 
     def _check_updates(self) -> None:
-        if self.db.get_setting("auto_update_check", "0") != "1":
+        if self.db.get_setting("auto_update_check", "1") != "1":
             return
         from config import APP_PROMO_URL, APP_VERSION, GITHUB_UPDATE_REPO
-        from core.app_extras import latest_github_release
+        from core.app_extras import latest_github_release, latest_site_version
 
-        repo = (self.db.get_setting("github_repo") or GITHUB_UPDATE_REPO or "").strip()
-        if not repo:
-            url = (APP_PROMO_URL or "https://younews.media").rstrip("/")
+        site = latest_site_version(APP_PROMO_URL or "https://younews.media")
+        remote = str((site or {}).get("version") or "").lstrip("v")
+        local = APP_VERSION.lstrip("v")
+        if remote and remote != local:
+            notes_url = str((site or {}).get("url") or APP_PROMO_URL or "https://younews.media").rstrip("/")
             self.statusBar().showMessage(
-                self.i18n.t("app.update_check_site").replace("{url}", url),
-                7000,
+                self.i18n.t("app.update_available")
+                .replace("{version}", remote)
+                .replace("{url}", notes_url),
+                10000,
             )
             return
+        repo = (self.db.get_setting("github_repo") or GITHUB_UPDATE_REPO or "").strip()
+        if not repo:
+            return
         tag = latest_github_release(repo)
-        if tag and tag != APP_VERSION.lstrip("v"):
-            self.statusBar().showMessage(self.i18n.t("app.update_available").replace("{version}", tag), 8000)
+        if tag and tag.lstrip("v") != local:
+            self.statusBar().showMessage(
+                self.i18n.t("app.update_available")
+                .replace("{version}", tag)
+                .replace("{url}", (APP_PROMO_URL or "https://younews.media").rstrip("/")),
+                8000,
+            )
 
     def _refresh_offline(self) -> None:
         import socket
