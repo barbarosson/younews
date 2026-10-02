@@ -70,6 +70,7 @@ class MainWindow(QMainWindow):
         self._translate_worker: TranslateWorker | None = None
         self._translate_silent = False
         self._chat_worker: ChatWorker | None = None
+        self._desk_pending: dict | None = None
         self._image_worker: ImagePrefetchWorker | None = None
         self._fulltext_worker: FullTextWorker | None = None
         self._page_worker: PageReadWorker | None = None
@@ -178,6 +179,7 @@ class MainWindow(QMainWindow):
         self.ticker.hover_cleared.connect(self._on_ticker_leave)
         self.ticker.watchlist_requested.connect(self._open_watchlist)
         self.chat_panel.message_submitted.connect(self._on_chat_message)
+        self.chat_panel.cleared.connect(lambda: setattr(self, "_desk_pending", None))
         self.chat_panel.article_requested.connect(self._show_article)
         self.chat_panel.url_requested.connect(self._open_chat_url)
 
@@ -550,6 +552,7 @@ class MainWindow(QMainWindow):
         self.chat_panel.setMinimumWidth(280 if visible else 0)
         self._balance_panes()
         if visible:
+            self.chat_panel.offer_desk_help()
             self.chat_panel.input.setFocus()
 
     def _open_chat_url(self, url: str) -> None:
@@ -574,6 +577,8 @@ class MainWindow(QMainWindow):
             self.sidebar.current_module_id() or "economy_markets",
             self.sidebar.current_topic_id(),
             self,
+            pending=self._desk_pending,
+            translator=self.i18n.t,
         )
         self._chat_worker.finished_ok.connect(self._on_chat_result)
         self._chat_worker.failed.connect(self._on_chat_error)
@@ -584,12 +589,24 @@ class MainWindow(QMainWindow):
         self.statusBar().clearMessage()
         data = payload if isinstance(payload, dict) else {}
         import_notes = self._format_import_notes(data.get("imported_sources") or [])
+        self._desk_pending = data.get("pending") if isinstance(data.get("pending"), dict) else None
         imported_ok = any(
             isinstance(item, dict) and item.get("status") in {"added", "duplicate"}
             for item in (data.get("imported_sources") or [])
         )
-        if imported_ok:
+        applied = data.get("applied") if isinstance(data.get("applied"), dict) else {}
+        if imported_ok or applied.get("sources"):
+            reload = getattr(self.sidebar, "reload_modules", None)
+            if callable(reload):
+                reload()
             self._reload_articles(recount=True)
+        if applied.get("tickers"):
+            self._sync_ticker_tape()
+            self.market.refresh()
+        if applied.get("refresh"):
+            self.refresh_feeds()
+        elif imported_ok:
+            self.refresh_feeds()
         in_scope = bool(data.get("in_scope", True))
         reply = str(data.get("reply") or "").strip()
         if import_notes:
@@ -597,13 +614,7 @@ class MainWindow(QMainWindow):
         if not in_scope:
             reply = reply or self.i18n.t("chat.refuse")
             self.chat_panel.append_assistant(reply)
-            self.chat_panel.set_suggestions(
-                [
-                    self.i18n.t("chat.suggest_markets"),
-                    self.i18n.t("chat.suggest_crypto"),
-                    self.i18n.t("chat.suggest_world"),
-                ]
-            )
+            self.chat_panel.offer_desk_help()
             return
         article_ids: list[int] = []
         for item in data.get("article_ids") or []:

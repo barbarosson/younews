@@ -12,8 +12,9 @@ from database.models import Article
 
 CHAT_SYSTEM = (
     "You are You News, a news-desk assistant. You may ONLY discuss news, markets, "
-    "geopolitics, sports headlines, science/tech news, the provided articles, and "
-    "adding user-supplied news site or RSS URLs to this app. "
+    "geopolitics, sports headlines, science/tech news, the provided articles, "
+    "country/topic source packs, social follows (YouTube/Substack/Bluesky), "
+    "ticker symbols on the market tape, and adding user-supplied news site or RSS URLs. "
     "If the user asks for recipes, homework, coding unrelated to news, medical advice, "
     "personal life, or anything outside news, set in_scope=false and politely refuse. "
     "Never invent headlines, URLs, or article ids. Use only the catalog and import results. "
@@ -38,10 +39,18 @@ def answer_news_chat(
     date_order: str | None = None,
     module_id: str | None = None,
     topic_id: str | None = None,
+    pending: dict | None = None,
+    translator=None,
 ) -> dict:
     text = (message or "").strip()
     selected = db.get_article(selected_article_id) if selected_article_id else None
     imported = _import_urls_from_message(db, text, module_id or "economy_markets", topic_id)
+    if translator is not None and not imported:
+        from core.desk_steward import handle_desk
+
+        desk = handle_desk(db, text, t=translator, pending=pending)
+        if desk.get("handled"):
+            return desk
     catalog = _retrieve(db, text, selected, date_order=date_order)
     allowed_ids = {article.id for article in catalog}
     allowed_urls = {str(article.link).strip() for article in catalog if article.link}

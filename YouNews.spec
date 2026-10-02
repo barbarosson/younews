@@ -45,7 +45,7 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=["rthooks/vcruntime_first.py"],
     excludes=[
         "PySide6.QtWebEngineCore",
         "PySide6.QtWebEngineWidgets",

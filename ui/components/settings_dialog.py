@@ -127,10 +127,15 @@ class SettingsDialog(QDialog):
         self.minimize_tray = QCheckBox()
         self.start_windows = QCheckBox()
         self.notify_alerts = QCheckBox()
-        self.pack_tr = QPushButton()
-        self.pack_us = QPushButton()
-        self.pack_eu = QPushButton()
-        self.pack_mastodon = QPushButton()
+        self.pack_buttons: dict[str, QPushButton] = {}
+        for pack_id in ("tr", "us", "eu", "uk", "de", "fr", "jp", "tech", "science", "crypto", "sport", "mastodon"):
+            button = QPushButton()
+            button.setObjectName("ghostButton")
+            self.pack_buttons[pack_id] = button
+        self.pack_tr = self.pack_buttons["tr"]
+        self.pack_us = self.pack_buttons["us"]
+        self.pack_eu = self.pack_buttons["eu"]
+        self.pack_mastodon = self.pack_buttons["mastodon"]
         self.backup_btn = QPushButton()
         self.restore_btn = QPushButton()
         self.backup_btn.setObjectName("ghostButton")
@@ -277,10 +282,8 @@ class SettingsDialog(QDialog):
         extra_row.addWidget(self.mini_tape_btn)
         form.addRow(extra_row)
         pack_row = FlowLayout()
-        pack_row.addWidget(self.pack_tr)
-        pack_row.addWidget(self.pack_us)
-        pack_row.addWidget(self.pack_eu)
-        pack_row.addWidget(self.pack_mastodon)
+        for button in self.pack_buttons.values():
+            pack_row.addWidget(button)
         form.addRow(pack_row)
         backup_row = FlowLayout()
         backup_row.addWidget(self.backup_btn)
@@ -387,10 +390,8 @@ class SettingsDialog(QDialog):
         self.ticker_search.returnPressed.connect(self._add_selected_result)
         self.ticker_results.itemActivated.connect(lambda _item: self._add_selected_result())
         self.ticker_results.currentItemChanged.connect(self._on_ticker_result_changed)
-        self.pack_tr.clicked.connect(lambda: self._apply_pack("tr"))
-        self.pack_us.clicked.connect(lambda: self._apply_pack("us"))
-        self.pack_eu.clicked.connect(lambda: self._apply_pack("eu"))
-        self.pack_mastodon.clicked.connect(lambda: self._apply_pack("mastodon"))
+        for pack_id, button in self.pack_buttons.items():
+            button.clicked.connect(lambda _checked=False, value=pack_id: self._apply_pack(value))
         self.backup_btn.clicked.connect(self._backup)
         self.restore_btn.clicked.connect(self._restore)
         self.vacuum_btn.clicked.connect(self._vacuum)
@@ -522,10 +523,8 @@ class SettingsDialog(QDialog):
         self.tape_speed.clear()
         for pct in (50, 100, 150, 200):
             self.tape_speed.addItem(f"{pct}%", pct)
-        self.pack_tr.setText(self._i18n.t("sources.pack_tr"))
-        self.pack_us.setText(self._i18n.t("sources.pack_us"))
-        self.pack_eu.setText(self._i18n.t("sources.pack_eu"))
-        self.pack_mastodon.setText(self._i18n.t("sources.pack_mastodon"))
+        for pack_id, button in self.pack_buttons.items():
+            button.setText(self._i18n.t(f"sources.pack_{pack_id}"))
         self.backup_btn.setText(self._i18n.t("app.backup"))
         self.restore_btn.setText(self._i18n.t("app.restore"))
         self.modules_label.setText(self._i18n.t("app.modules"))

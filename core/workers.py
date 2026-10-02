@@ -197,6 +197,8 @@ class ChatWorker(QThread):
         module_id: str | None = None,
         topic_id: str | None = None,
         parent=None,
+        pending: dict | None = None,
+        translator=None,
     ) -> None:
         super().__init__(parent)
         self._db = db
@@ -207,6 +209,8 @@ class ChatWorker(QThread):
         self._date_order = date_order
         self._module_id = module_id
         self._topic_id = topic_id
+        self._pending = pending
+        self._translator = translator
 
     def run(self) -> None:
         try:
@@ -219,6 +223,8 @@ class ChatWorker(QThread):
                 date_order=self._date_order,
                 module_id=self._module_id,
                 topic_id=self._topic_id,
+                pending=self._pending,
+                translator=self._translator,
             )
             self.finished_ok.emit(result)
         except Exception as exc:

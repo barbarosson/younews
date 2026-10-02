@@ -27,6 +27,7 @@ class ChatPanel(QFrame):
     message_submitted = Signal(str)
     article_requested = Signal(int)
     url_requested = Signal(str)
+    cleared = Signal()
 
     def __init__(self, i18n: I18nManager, parent=None, db=None) -> None:
         super().__init__(parent)
@@ -77,13 +78,7 @@ class ChatPanel(QFrame):
         if stored:
             self._history = stored
             self._render()
-            self.set_suggestions(
-                [
-                    self._i18n.t("chat.suggest_markets"),
-                    self._i18n.t("chat.suggest_crypto"),
-                    self._i18n.t("chat.suggest_world"),
-                ]
-            )
+            self.offer_desk_help()
         else:
             self.reset()
 
@@ -110,11 +105,16 @@ class ChatPanel(QFrame):
         if self._db:
             self._db.clear_chat_messages()
         self._render()
+        self.offer_desk_help()
+        self.cleared.emit()
+
+    def offer_desk_help(self) -> None:
         self.set_suggestions(
             [
-                self._i18n.t("chat.suggest_markets"),
-                self._i18n.t("chat.suggest_crypto"),
-                self._i18n.t("chat.suggest_world"),
+                self._i18n.t("chat.suggest_pack"),
+                self._i18n.t("chat.suggest_topic"),
+                self._i18n.t("chat.suggest_social"),
+                self._i18n.t("chat.suggest_tickers"),
             ]
         )
 
