@@ -450,7 +450,7 @@
   "tutorial.chat.body": "<p>Asistan yalnızca bu uygulamadaki haberleri konuşur.</p><ol><li>Soldan haber asistanını açın.</li><li>Piyasa, şirket veya ülke sorun.</li><li>Kaynak eklemek için bir haber sitesi veya RSS adresi yapıştırın.</li><li>Eşleşen manşetler tıklanabilir olarak gelir.</li></ol>",
   "app.about": "Hakkında",
   "app.about_license": "You News bir Windows masaüstü haber okuyucusudur. Manşetler ve ayarlar bu bilgisayarda kalır. Yapay zekâ sizin API anahtarınızı veya yerel Ollama’yı kullanır; model erişimi satılmaz.",
-  "app.disclaimer": "<p><b>You News bağımsız bir okuyucu</b> — Yahoo, Microsoft veya bir gazetenin ürünü değil. Piyasa şeridi Yahoo Finance verisini yfinance ile gösterir. Rakamlar gecikebilir; bir bakış içindir, işlem tavsiyesi değil.</p><p>Manşet ve yazı yayıncıya aittir. Siz kaynağı eklersiniz, You News okumanız için çeker. O metni satmayız.</p><p>Bu siteden alınan kopyada siparişi Paddle.com yürütür (Merchant of Record; ödeme, destek, iade). Satış şimdilik younews.media üzerinden planlanıyor.</p>",
+  "app.disclaimer": "<p><b>You News bağımsız bir okuyucu</b> — Yahoo, Microsoft veya bir gazetenin ürünü değil. Piyasa şeridi Yahoo Finance verisini yfinance ile gösterir. Rakamlar gecikebilir; bir bakış içindir, işlem tavsiyesi değil.</p><p>Manşet ve yazı yayıncıya aittir. Siz kaynağı eklersiniz, You News okumanız için çeker. O metni satmayız.</p><p>Satın alma Microsoft Store üzerinden yürür (ödeme, destek ve iade). younews.media yalnızca ürün sitesidir — ödeme orada alınmaz.</p>",
   "app.copy_link": "Bağlantıyı kopyala",
   "share.title": "Paylaş",
   "share.hint": "Metni düzenleyip sosyal medya veya mesajlaşma uygulamasına gönderin. You News satırı uygulama tanıtımıdır.",

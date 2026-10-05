@@ -5,5 +5,7 @@
   "DisplayName": "YOUNEWS",
   "Description": "Your news desk on Windows. Headlines stay on this PC.",
   "Version": "1.5.0.0",
-  "Architecture": "x64"
+  "Architecture": "x64",
+  "PackageFamilyName": "MODULUSTECH.YOUNEWS_6w2d1brm94m3m",
+  "StoreDeepLink": "ms-windows-store://pdp/?PFN=MODULUSTECH.YOUNEWS_6w2d1brm94m3m"
 }

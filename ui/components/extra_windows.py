@@ -38,7 +38,14 @@ def disclaimer_html(i18n: I18nManager) -> str:
     except Exception:
         store = False
     if store:
-        text = "</p>".join(part for part in text.split("</p>") if "Paddle" not in part)
+        # Store build: drop the website / MoR purchase paragraph (redundant in-app).
+        drop = ("Paddle", "Microsoft Store", "younews.media is the product site", "yalnızca ürün sitesidir")
+        parts = []
+        for part in text.split("</p>"):
+            if any(token in part for token in drop) and ("purchase" in part.lower() or "satın" in part.lower() or "Merchant" in part or "ödeme" in part.lower()):
+                continue
+            parts.append(part)
+        text = "</p>".join(parts)
     return text
 
 

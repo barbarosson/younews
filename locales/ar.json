@@ -450,7 +450,7 @@
   "tutorial.chat.body": "<p>The assistant only talks about news in this app.</p><ol><li>Open the news assistant from the left.</li><li>Ask about markets, a company, or a country.</li><li>Paste a news site or RSS URL to add it as a source.</li><li>Matching headlines appear as clickable stories.</li></ol>",
   "app.about": "About",
   "app.about_license": "You News is a Windows desktop news reader. Headlines and settings stay on this PC. AI uses your own API key or local Ollama — we do not sell model access.",
-  "app.disclaimer": "<p><b>You News is an independent reader</b> — not a Yahoo, Microsoft, or newsroom product. The market tape shows Yahoo Finance figures through yfinance. Numbers can lag; they’re a glance, not investment advice.</p><p>Headlines and article text stay with their publishers. You add a source; You News fetches it for you to read. We don’t sell that writing.</p><p>Website purchases use Paddle.com as Merchant of Record (payment, support, refunds). Sales are planned through younews.media for now.</p>",
+  "app.disclaimer": "<p><b>You News is an independent reader</b> — not a Yahoo, Microsoft, or newsroom product. The market tape shows Yahoo Finance figures through yfinance. Numbers can lag; they’re a glance, not investment advice.</p><p>Headlines and article text stay with their publishers. You add a source; You News fetches it for you to read. We don’t sell that writing.</p><p>Purchases go through the Microsoft Store (payment, support, and refunds). younews.media is the product site only — checkout is not taken there.</p>",
   "app.copy_link": "Copy link",
   "share.title": "Share",
   "share.hint": "Edit the message, then send it to a social or messaging app. The You News line is marketing copy for the desktop app.",
